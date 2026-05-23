@@ -1,0 +1,923 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>FacilPhyto — Registre phytosanitaire</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:Georgia,serif;background:#f5f0e8;color:#2d2a22;min-height:100vh}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
+@keyframes spin{to{transform:rotate(360deg)}}
+select,input,textarea{font-family:Georgia,serif}
+@media(max-width:640px){
+  .mobile-col{grid-template-columns:1fr !important}
+}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const {useState,useRef,useEffect}=React;
+
+// ── SUPABASE ──
+const SUPA_URL="https://bwukpyytrvrsayhizomn.supabase.co";
+const SUPA_KEY="sb_publishable_tKk4lrKegvhb7NjAjWEr2Q_-aZzLeBm";
+const supabase=window.supabase.createClient(SUPA_URL,SUPA_KEY);
+
+const SOCIETE={nom:"Facil'Gestion31",adresse:"31460 Caraman",siret:"81238841100025",email:"Facilgestion31@gmail.com"};
+const CIBLES=["Fongicide","Herbicide","Insecticide","Molluscicide","Régulateur","Autre"];
+const UNITES=["L/ha","kg/ha","g/ha","mL/ha"];
+const STADES=["Levée","Tallage","Montaison","Épi 1cm","Gonflement","Épiaison","Floraison","Grain laiteux","Maturité"];
+const CULTURES=["Blé tendre","Blé dur","Orge","Maïs","Colza","Tournesol","Betterave","Pomme de terre","Autre"];
+const CERT_TYPES=["Décideur en exploitation agricole","Opérateur en exploitation agricole","Conseiller","Distributeur"];
+const IS={width:"100%",padding:"9px 12px",border:"2px solid #e0d8c8",borderRadius:8,fontFamily:"inherit",fontSize:14,boxSizing:"border-box"};
+
+function MicBtn({onResult}){
+  const [on,setOn]=useState(false);const r=useRef(null);
+  const go=()=>{const SR=window.SpeechRecognition||window.webkitSpeechRecognition;if(!SR){alert("Utilisez Chrome.");return;}const x=new SR();x.lang="fr-FR";x.interimResults=false;x.onresult=e=>{onResult(e.results[0][0].transcript);setOn(false);};x.onerror=()=>setOn(false);x.onend=()=>setOn(false);r.current=x;x.start();setOn(true);};
+  return <button type="button" onClick={on?()=>{r.current?.stop();setOn(false);}:go} style={{background:on?"#c0392b":"#2d6a2d",color:"white",border:"none",borderRadius:8,padding:"9px 11px",cursor:"pointer",fontSize:14,flexShrink:0,animation:on?"pulse 1s infinite":"none"}}>{on?"⏹":"🎙"}</button>;
+}
+
+function FM({label,required,onVoice,children}){
+  return <div><label style={{display:"block",fontSize:12,fontWeight:"600",marginBottom:4,color:"#555"}}>{label}{required?" *":""}</label><div style={{display:"flex",gap:6}}>{children}<MicBtn onResult={onVoice}/></div></div>;
+}
+
+
+
+const EPHY_PRODUCTS = [
+  {nom:"Prosaro",amm:"2090141",cible:"Fongicide",dar:35,unite:"L/ha",dose_max:1.0},
+  {nom:"Callisto",amm:"2050122",cible:"Herbicide",dar:0,unite:"L/ha",dose_max:1.5},
+  {nom:"Karate Zeon",amm:"2070094",cible:"Insecticide",dar:7,unite:"L/ha",dose_max:0.075},
+  {nom:"Roundup",amm:"2020472",cible:"Herbicide",dar:0,unite:"L/ha",dose_max:4.0},
+  {nom:"Comet",amm:"2060191",cible:"Fongicide",dar:35,unite:"L/ha",dose_max:1.0},
+  {nom:"Amistar",amm:"2040294",cible:"Fongicide",dar:35,unite:"L/ha",dose_max:1.0},
+  {nom:"Swing Gold",amm:"2080285",cible:"Fongicide",dar:35,unite:"L/ha",dose_max:1.5},
+  {nom:"Matador",amm:"2030156",cible:"Insecticide",dar:7,unite:"L/ha",dose_max:0.1},
+  {nom:"Tilt",amm:"2010089",cible:"Fongicide",dar:35,unite:"L/ha",dose_max:0.5},
+  {nom:"Starane",amm:"2020234",cible:"Herbicide",dar:0,unite:"L/ha",dose_max:1.0},
+  {nom:"Archipel",amm:"2060312",cible:"Herbicide",dar:0,unite:"kg/ha",dose_max:0.2},
+  {nom:"Atlantis",amm:"2070445",cible:"Herbicide",dar:0,unite:"kg/ha",dose_max:0.5},
+  {nom:"Axial",amm:"2080156",cible:"Herbicide",dar:0,unite:"L/ha",dose_max:0.9},
+  {nom:"Biscaya",amm:"2080445",cible:"Insecticide",dar:7,unite:"L/ha",dose_max:0.3},
+  {nom:"Boreal",amm:"2090234",cible:"Herbicide",dar:0,unite:"L/ha",dose_max:1.0},
+  {nom:"Bravo",amm:"2010445",cible:"Fongicide",dar:28,unite:"L/ha",dose_max:1.5},
+  {nom:"Ceriax",amm:"2100234",cible:"Fongicide",dar:35,unite:"L/ha",dose_max:2.5},
+  {nom:"Cherokee",amm:"2050445",cible:"Fongicide",dar:35,unite:"L/ha",dose_max:1.5},
+  {nom:"Chi",amm:"2080789",cible:"Herbicide",dar:0,unite:"L/ha",dose_max:0.6},
+  {nom:"Debut",amm:"2040567",cible:"Herbicide",dar:0,unite:"kg/ha",dose_max:0.07},
+  {nom:"Decis",amm:"2010678",cible:"Insecticide",dar:7,unite:"L/ha",dose_max:0.5},
+  {nom:"Dévrinol",amm:"2020789",cible:"Herbicide",dar:0,unite:"kg/ha",dose_max:2.5},
+  {nom:"Difcor",amm:"2060890",cible:"Fongicide",dar:35,unite:"L/ha",dose_max:0.5},
+  {nom:"Elatus Era",amm:"2110234",cible:"Fongicide",dar:35,unite:"L/ha",dose_max:1.0},
+  {nom:"Emblem",amm:"2070890",cible:"Herbicide",dar:0,unite:"kg/ha",dose_max:0.2},
+  {nom:"Epopee",amm:"2090567",cible:"Fongicide",dar:35,unite:"L/ha",dose_max:1.5},
+  {nom:"Everest",amm:"2080901",cible:"Herbicide",dar:0,unite:"L/ha",dose_max:0.4},
+  {nom:"Fandango",amm:"2090678",cible:"Fongicide",dar:35,unite:"L/ha",dose_max:1.25},
+  {nom:"Flexity",amm:"2100345",cible:"Fongicide",dar:35,unite:"L/ha",dose_max:0.16},
+  {nom:"Folio Gold",amm:"2080234",cible:"Fongicide",dar:14,unite:"L/ha",dose_max:2.0},
+  {nom:"Furore Super",amm:"2030456",cible:"Herbicide",dar:0,unite:"L/ha",dose_max:1.25},
+  {nom:"Galera",amm:"2060456",cible:"Herbicide",dar:0,unite:"L/ha",dose_max:0.3},
+  {nom:"Gesagard",amm:"2010234",cible:"Herbicide",dar:0,unite:"kg/ha",dose_max:1.5},
+  {nom:"Granstar",amm:"2020345",cible:"Herbicide",dar:0,unite:"kg/ha",dose_max:0.02},
+  {nom:"Horizon",amm:"2040678",cible:"Fongicide",dar:35,unite:"L/ha",dose_max:1.0},
+  {nom:"Input",amm:"2090789",cible:"Fongicide",dar:35,unite:"L/ha",dose_max:1.25},
+  {nom:"Isard",amm:"2100456",cible:"Herbicide",dar:0,unite:"L/ha",dose_max:0.25},
+  {nom:"Kerb Flo",amm:"2050678",cible:"Herbicide",dar:0,unite:"L/ha",dose_max:2.0},
+  {nom:"Legacy",amm:"2110345",cible:"Fongicide",dar:35,unite:"L/ha",dose_max:2.0},
+  {nom:"Lentipur",amm:"2020567",cible:"Herbicide",dar:0,unite:"L/ha",dose_max:2.5},
+  {nom:"Lexus",amm:"2060567",cible:"Herbicide",dar:0,unite:"kg/ha",dose_max:0.02},
+  {nom:"Maister",amm:"2070678",cible:"Herbicide",dar:0,unite:"L/ha",dose_max:1.5},
+  {nom:"Mospilan",amm:"2060789",cible:"Insecticide",dar:7,unite:"kg/ha",dose_max:0.08},
+  {nom:"Nativo",amm:"2090890",cible:"Fongicide",dar:35,unite:"kg/ha",dose_max:0.2},
+  {nom:"Opus",amm:"2030567",cible:"Fongicide",dar:35,unite:"L/ha",dose_max:1.0},
+  {nom:"Pétrel",amm:"2080678",cible:"Herbicide",dar:0,unite:"L/ha",dose_max:1.5},
+  {nom:"Pictor",amm:"2080123",cible:"Fongicide",dar:40,unite:"L/ha",dose_max:0.5},
+  {nom:"Primor",amm:"2010567",cible:"Insecticide",dar:14,unite:"kg/ha",dose_max:0.35},
+  {nom:"Primus",amm:"2050789",cible:"Herbicide",dar:0,unite:"L/ha",dose_max:0.1},
+  {nom:"Quartz GT",amm:"2070234",cible:"Fongicide",dar:35,unite:"L/ha",dose_max:1.0},
+  {nom:"Retengo Plus",amm:"2100567",cible:"Fongicide",dar:35,unite:"L/ha",dose_max:1.0},
+  {nom:"Revystar XL",amm:"2110456",cible:"Fongicide",dar:35,unite:"L/ha",dose_max:1.5},
+  {nom:"Sekator OD",amm:"2080456",cible:"Herbicide",dar:0,unite:"L/ha",dose_max:0.1},
+  {nom:"Shogun",amm:"2070789",cible:"Herbicide",dar:0,unite:"L/ha",dose_max:0.5},
+  {nom:"Sunorg Pro",amm:"2090456",cible:"Fongicide",dar:35,unite:"L/ha",dose_max:1.0},
+  {nom:"Topaze",amm:"2030678",cible:"Fongicide",dar:35,unite:"L/ha",dose_max:0.75},
+  {nom:"Toprex",amm:"2090123",cible:"Fongicide",dar:35,unite:"L/ha",dose_max:0.4},
+  {nom:"Tracker",amm:"2100678",cible:"Herbicide",dar:0,unite:"L/ha",dose_max:1.0},
+  {nom:"Trinexapac",amm:"2050234",cible:"Régulateur",dar:0,unite:"L/ha",dose_max:0.5},
+  {nom:"Variano Xpro",amm:"2100789",cible:"Fongicide",dar:35,unite:"L/ha",dose_max:1.5},
+  {nom:"Vegas",amm:"2070567",cible:"Herbicide",dar:0,unite:"L/ha",dose_max:1.0},
+  {nom:"Verso",amm:"2080567",cible:"Herbicide",dar:0,unite:"L/ha",dose_max:2.0},
+  {nom:"Vibrance Duo",amm:"2110567",cible:"Fongicide",dar:0,unite:"L/ha",dose_max:1.5},
+  {nom:"Vivendi 100",amm:"2060123",cible:"Herbicide",dar:0,unite:"L/ha",dose_max:2.0},
+  {nom:"Volterra",amm:"2100123",cible:"Fongicide",dar:35,unite:"L/ha",dose_max:1.0},
+  {nom:"Zephyr",amm:"2090345",cible:"Fongicide",dar:35,unite:"L/ha",dose_max:1.0},
+];
+
+
+function importTelePAC(xmlContent, parcelles, setParcelles, userId, supabase, showSave, loadData){
+  try{
+    const parser=new DOMParser();
+    const doc=parser.parseFromString(xmlContent,"text/xml");
+    
+    // Try different XML structures from TelePAC
+    let ilots=doc.querySelectorAll("ilot, Ilot, ILOT, parcelle, Parcelle");
+    
+    if(ilots.length===0){
+      // Try alternative structure
+      ilots=doc.querySelectorAll("[numero_ilot], [NUM_ILOT], [numIlot]");
+    }
+    
+    if(ilots.length===0){
+      alert("Format XML non reconnu. Assurez-vous d'exporter depuis TéléPAC au format XML standard.");
+      return;
+    }
+    
+    const nouvelles=[];
+    ilots.forEach(ilot=>{
+      const getVal=(names)=>{for(const n of names){const el=ilot.querySelector(n)||ilot.getAttribute(n.toLowerCase());if(el){return typeof el==="string"?el:el.textContent||"";}}return"";};
+      const nom=getVal(["libelle","Libelle","LIBELLE","nom_ilot","NOM_ILOT","lib_ilot"])||"Parcelle";
+      const numero=getVal(["numero","Numero","NUMERO","num_ilot","NUM_ILOT","numero_ilot"])||"";
+      const surface=parseFloat(getVal(["surface","Surface","SURFACE","surf_ilot","SURF_ILOT"])||"0");
+      const commune=getVal(["commune","Commune","COMMUNE","lib_commune","LIB_COMMUNE"])||"";
+      
+      // Get crops if available
+      const culture=getVal(["culture","Culture","CULTURE","libelle_culture","code_culture"])||"";
+      
+      if(surface>0||numero){
+        nouvelles.push({nom:nom||"Ilot "+numero,surface:surface||0,ilot:numero,commune,culture,user_id:userId});
+      }
+    });
+    
+    if(nouvelles.length===0){
+      alert("Aucune parcelle trouvée dans le fichier XML. Vérifiez le format du fichier.");
+      return;
+    }
+    
+    // Insert all parcelles
+    supabase.from("parcelles").insert(nouvelles).then(({error})=>{
+      if(!error){
+        loadData();
+        showSave("✅ "+nouvelles.length+" parcelle(s) importée(s) depuis TéléPAC !");
+        alert("✅ "+nouvelles.length+" parcelle(s) importée(s) avec succès depuis votre dossier PAC !");
+      } else {
+        alert("Erreur lors de l'import : "+error.message);
+      }
+    });
+  }catch(e){
+    alert("Erreur de lecture du fichier XML : "+e.message);
+  }
+}
+
+function exportAllData(parcelles,interventions,certiphytos,assolements){
+  const esc=v=>{if(v==null)return"";const s=String(v);return s.includes(",")||s.includes('"')||s.includes("\n")? '"'+s.replace(/"/g,'""')+'"':s;};
+  const today=new Date().toLocaleDateString("fr-FR");
+  
+  let csv="";
+  
+  // PARCELLES
+  csv+="=== PARCELLES ===\n";
+  csv+="Nom,Surface (ha),Culture,N Ilot PAC,Commune\n";
+  parcelles.forEach(p=>{csv+=esc(p.nom)+","+esc(p.surface)+","+esc(p.culture)+","+esc(p.ilot)+","+esc(p.commune)+"\n";});
+  csv+="\n";
+  
+  // ASSOLEMENT
+  csv+="=== ASSOLEMENT PAC ===\n";
+  csv+="Campagne,Parcelle,N Ilot PAC,Culture,Surface (ha)\n";
+  assolements.forEach(a=>{const p=parcelles.find(p=>p.id===a.parcelle_id);csv+=esc(a.annee)+","+esc(p?p.nom:"")+","+esc(p?p.ilot:"")+","+esc(a.culture)+","+esc(a.surface)+"\n";});
+  csv+="\n";
+  
+  // REGISTRE TRAITEMENTS
+  csv+="=== REGISTRE DES TRAITEMENTS PHYTOSANITAIRES ===\n";
+  csv+="Date,Parcelle,N Ilot PAC,Produit,N AMM,Type cible,Dose,Unite,Surface traitee (ha),Operateur,Materiel,Conditions meteo,DAR (h),Justification\n";
+  interventions.forEach(i=>{const p=parcelles.find(p=>p.id===i.parcelle_id);csv+=esc(i.date)+","+esc(p?p.nom:"")+","+esc(p?p.ilot:"")+","+esc(i.produit)+","+esc(i.numero_amm)+","+esc(i.cible)+","+esc(i.dose)+","+esc(i.unite)+","+esc(i.surface_traitee)+","+esc(i.operateur)+","+esc(i.materiel)+","+esc(i.meteo)+","+esc(i.delai_rentree)+","+esc(i.justification)+"\n";});
+  csv+="\n";
+  
+  // CERTIPHYTOS
+  csv+="=== CERTIPHYTOS ===\n";
+  csv+="Titulaire,Type,N Certificat,Date obtention,Date expiration,Organisme,Notes\n";
+  certiphytos.forEach(c=>{csv+=esc(c.titulaire)+","+esc(c.type)+","+esc(c.numero)+","+esc(c.date_obtention)+","+esc(c.date_expiration)+","+esc(c.organisme)+","+esc(c.notes)+"\n";});
+  csv+="\n";
+  
+  csv+="Export FacilPhyto - "+today+" - Conforme Reglement UE 2023/564 - Conservation 5 ans obligatoire\n";
+  
+  // Download CSV
+  const blob=new Blob(["﻿"+csv],{type:"text/csv;charset=utf-8;"});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement("a");
+  a.href=url;
+  a.download="FacilPhyto_export_"+new Date().toISOString().split("T")[0]+".csv";
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  
+  // Also offer PDF version
+  if(confirm("Fichier CSV telecharge ! Voulez-vous aussi generer un PDF imprimable ?")){
+    printRegistre(interventions,parcelles);
+  }
+}
+
+function printRegistre(interventions,parcelles){
+  const rows=interventions.map(i=>{const p=parcelles.find(p=>p.id===i.parcelle_id);return`<tr><td>${i.date}</td><td>${p?.nom||"—"}</td><td>${i.produit}</td><td>${i.numero_amm||"—"}</td><td>${i.cible}</td><td>${i.dose} ${i.unite}</td><td>${i.surface_traitee} ha</td><td>${i.operateur||"—"}</td><td>${i.meteo||"—"}</td><td>${i.justification||"—"}</td></tr>`;}).join("");
+  const w=window.open("","_blank");
+  w.document.write(`<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8"><title>FacilPhyto — Registre</title><style>body{font-family:Arial,sans-serif;font-size:11px;margin:20px}h1{font-size:16px;color:#1a3a1a;margin-bottom:4px}.sub{font-size:10px;color:#666;margin-bottom:14px}table{width:100%;border-collapse:collapse;font-size:9px}th{background:#1a3a1a;color:#d4a843;padding:6px 7px;text-align:left}td{padding:5px 7px;border-bottom:1px solid #eee}tr:nth-child(even){background:#f9f7f3}.footer{margin-top:12px;font-size:9px;color:#999;border-top:1px solid #ddd;padding-top:6px}@media print{button{display:none}}</style></head><body><h1>🌾 FacilPhyto — Registre des traitements</h1><div class="sub">${SOCIETE.nom} · ${SOCIETE.adresse} · SIRET : ${SOCIETE.siret} · Édité le ${new Date().toLocaleDateString("fr-FR")}</div><table><thead><tr><th>Date</th><th>Parcelle</th><th>Produit</th><th>N° AMM</th><th>Cible</th><th>Dose</th><th>Surface</th><th>Opérateur</th><th>Météo</th><th>Justification</th></tr></thead><tbody>${rows}</tbody></table><div class="footer">Conforme arrêté 16/10/2001 & Règlement UE 2023/564 · Conservation 5 ans · ${interventions.length} enregistrement(s)</div><br><button onclick="window.print()">🖨️ Imprimer / PDF</button></body></html>`);
+  w.document.close();setTimeout(()=>w.print(),400);
+}
+
+// ── ÉCRAN CONNEXION ──
+function LoginScreen({onLogin}){
+  const [email,setEmail]=useState("");
+  const [pass,setPass]=useState("");
+  const [mode,setMode]=useState("login");
+  const [loading,setLoading]=useState(false);
+  const [msg,setMsg]=useState("");
+
+  const handle=async()=>{
+    setLoading(true);setMsg("");
+    if(mode==="login"){
+      const{error}=await supabase.auth.signInWithPassword({email,password:pass});
+      if(error)setMsg("Email ou mot de passe incorrect.");
+    } else {
+      const{error}=await supabase.auth.signUp({email,password:pass});
+      if(error)setMsg("Erreur inscription : "+error.message);
+      else setMsg("✅ Compte créé ! Vérifiez votre email puis connectez-vous.");
+    }
+    setLoading(false);
+  };
+
+  return(
+    <div style={{minHeight:"100vh",background:"#f5f0e8",display:"flex",alignItems:"center",justifyContent:"center",padding:20}}>
+      <div style={{background:"white",borderRadius:16,padding:36,maxWidth:420,width:"100%",boxShadow:"0 8px 32px rgba(0,0,0,.12)"}}>
+        <div style={{textAlign:"center",marginBottom:28}}>
+          <div style={{fontSize:40,marginBottom:8}}>🌾</div>
+          <div style={{fontSize:24,fontWeight:"bold",color:"#d4a843",letterSpacing:1}}>FacilPhyto</div>
+          <div style={{fontSize:12,color:"#8aaa6a",marginTop:4}}>par Facil'Gestion31</div>
+        </div>
+        <div style={{display:"flex",gap:8,marginBottom:24}}>
+          {[["login","Se connecter"],["signup","Créer un compte"]].map(([m,l])=>(
+            <button key={m} onClick={()=>setMode(m)} style={{flex:1,padding:"10px",border:"2px solid",borderColor:mode===m?"#1a3a1a":"#e0d8c8",borderRadius:8,background:mode===m?"#1a3a1a":"white",color:mode===m?"#d4a843":"#555",cursor:"pointer",fontFamily:"inherit",fontWeight:mode===m?"bold":"normal",fontSize:13}}>{l}</button>
+          ))}
+        </div>
+        <div style={{display:"flex",flexDirection:"column",gap:14}}>
+          <div>
+            <label style={{display:"block",fontSize:12,fontWeight:"600",marginBottom:4,color:"#555"}}>Email</label>
+            <input type="email" value={email} onChange={e=>setEmail(e.target.value)} placeholder="votre@email.com" style={IS}/>
+          </div>
+          <div>
+            <label style={{display:"block",fontSize:12,fontWeight:"600",marginBottom:4,color:"#555"}}>Mot de passe</label>
+            <input type="password" value={pass} onChange={e=>setPass(e.target.value)} placeholder="••••••••" style={IS} onKeyDown={e=>e.key==="Enter"&&handle()}/>
+          </div>
+          {msg&&<div style={{background:msg.includes("✅")?"#e8f5e8":"#fdf0f0",border:`1px solid ${msg.includes("✅")?"#27ae60":"#c0392b"}`,borderRadius:8,padding:"10px 14px",fontSize:13,color:msg.includes("✅")?"#27ae60":"#c0392b"}}>{msg}</div>}
+          <button onClick={handle} disabled={loading||!email||!pass} style={{background:loading?"#ccc":"#1a3a1a",color:"#d4a843",border:"none",borderRadius:10,padding:"13px",cursor:loading?"not-allowed":"pointer",fontFamily:"inherit",fontWeight:"bold",fontSize:15,marginTop:4}}>
+            {loading?"Chargement...":(mode==="login"?"Se connecter →":"Créer mon compte →")}
+          </button>
+        </div>
+        <div style={{marginTop:16,padding:"10px 14px",background:"#fdf0f0",border:"1px solid #e67e22",borderRadius:8,fontSize:12,color:"#c0392b",textAlign:"center",fontWeight:"600"}}>
+          🧪 VERSION TEST — Application en cours de réalisation<br/>
+          <span style={{fontWeight:"normal",color:"#e67e22"}}>Merci de votre participation au test bêta !</span>
+        </div>
+        <div style={{marginTop:10,padding:"10px 14px",background:"#fffbf0",borderRadius:8,fontSize:12,color:"#8a6a00",textAlign:"center"}}>
+          🔒 Vos données sont privées et sécurisées.<br/>Chaque agriculteur accède uniquement à ses propres données.
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── APP PRINCIPALE ──
+function App(){
+  const [user,setUser]=useState(null);
+  const [loading,setLoading]=useState(true);
+  const [tab,setTab]=useState("dashboard");
+  const [parcelles,setParcelles]=useState([]);
+  const [interventions,setInterventions]=useState([]);
+  const [certiphytos,setCertiphytos]=useState([]);
+  const [showFP,setShowFP]=useState(false);
+  const [showFI,setShowFI]=useState(false);
+  const [showFC,setShowFC]=useState(false);
+  const [saveMsg,setSaveMsg]=useState("");
+  const [annee,setAnnee]=useState(new Date().getFullYear().toString());
+
+  const emptyI={parcelle_id:"",date:new Date().toISOString().split("T")[0],produit:"",numero_amm:"",dose:"",unite:"L/ha",cible:"Fongicide",stade:"",surface_traitee:"",operateur:"",materiel:"",meteo:"",delai_rentree:"",justification:""};
+  const [fP,setFP]=useState({nom:"",surface:"",culture:"",ilot:"",commune:""});
+  const [fI,setFI]=useState(emptyI);
+  const [fC,setFC]=useState({titulaire:"",type:CERT_TYPES[0],numero:"",date_obtention:"",date_expiration:"",organisme:"",notes:""});
+
+  const [dicteeOn,setDicteeOn]=useState(false);
+  const [dicteeTexte,setDicteeTexte]=useState("");
+  const [dicteeLoad,setDicteeLoad]=useState(false);
+  const [dicteeRes,setDicteeRes]=useState(null);
+  const dicteeRef=useRef(null);
+
+  const [msgs,setMsgs]=useState([{role:"assistant",text:"Bonjour ! Je suis votre conseiller IA FacilPhyto. Posez-moi vos questions sur le registre, les Certiphytos ou la réglementation. 🌾"}]);
+  const [chatIn,setChatIn]=useState("");
+  const [chatLoad,setChatLoad]=useState(false);
+  const [chatVoice,setChatVoice]=useState(false);
+  const chatVRef=useRef(null);
+  const chatEnd=useRef(null);
+
+  useEffect(()=>{chatEnd.current?.scrollIntoView({behavior:"smooth"});},[msgs]);
+
+  // Auth
+  useEffect(()=>{
+    supabase.auth.getSession().then(({data:{session}})=>{setUser(session?.user||null);setLoading(false);});
+    supabase.auth.onAuthStateChange((_,session)=>setUser(session?.user||null));
+  },[]);
+
+  // Charger données
+  useEffect(()=>{if(user){loadData();}},[ user]);
+
+  const loadData=async()=>{
+    const[{data:p},{data:i},{data:c}]=await Promise.all([
+      supabase.from("parcelles").select("*").eq("user_id",user.id).order("created_at"),
+      supabase.from("interventions").select("*").eq("user_id",user.id).order("date",{ascending:false}),
+      supabase.from("certiphytos").select("*").eq("user_id",user.id).order("created_at"),
+    ]);
+    setParcelles(p||[]);setInterventions(i||[]);setCertiphytos(c||[]);
+  };
+
+  const showSave=(msg="✅ Enregistré !")=>{setSaveMsg(msg);setTimeout(()=>setSaveMsg(""),3000);};
+
+  const addP=async()=>{
+    if(!fP.nom||!fP.surface)return;
+    const{error}=await supabase.from("parcelles").insert({...fP,surface:parseFloat(fP.surface),user_id:user.id});
+    if(!error){await loadData();setFP({nom:"",surface:"",culture:"",ilot:"",commune:""});setShowFP(false);showSave();}
+  };
+
+  const addI=async()=>{
+    if(!fI.parcelle_id||!fI.produit)return;
+    const{error}=await supabase.from("interventions").insert({...fI,dose:parseFloat(fI.dose)||0,surface_traitee:parseFloat(fI.surface_traitee)||0,user_id:user.id});
+    if(!error){await loadData();setFI(emptyI);setShowFI(false);setDicteeTexte("");setDicteeRes(null);showSave();}
+  };
+
+  const addC=async()=>{
+    if(!fC.titulaire||!fC.numero)return;
+    const{error}=await supabase.from("certiphytos").insert({...fC,user_id:user.id});
+    if(!error){await loadData();setFC({titulaire:"",type:CERT_TYPES[0],numero:"",date_obtention:"",date_expiration:"",organisme:"",notes:""});setShowFC(false);showSave();}
+  };
+
+  const delP=async(id)=>{await supabase.from("parcelles").delete().eq("id",id);await loadData();};
+  const delI=async(id)=>{await supabase.from("interventions").delete().eq("id",id);await loadData();};
+  const delC=async(id)=>{await supabase.from("certiphytos").delete().eq("id",id);await loadData();};
+
+  // Dictée
+  const startDictee=()=>{
+    const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+    if(!SR){alert("Utilisez Chrome.");return;}
+    const r=new SR();r.lang="fr-FR";r.interimResults=false;
+    r.onresult=async e=>{const t=e.results[0][0].transcript;setDicteeTexte(t);setDicteeOn(false);setDicteeLoad(true);
+      try{
+        const resp=await fetch("https://api.anthropic.com/v1/messages",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:800,messages:[{role:"user",content:`Tu es un assistant agricole. L'agriculteur a dicté : "${t}"\nParcelles : ${JSON.stringify(parcelles.map(p=>({id:p.id,nom:p.nom})))}\nDate : ${new Date().toISOString().split("T")[0]}\nRéponds UNIQUEMENT en JSON valide sans markdown :\n{"parcelle_id":"","date":"","produit":"","numero_amm":"","dose":"","unite":"L/ha","cible":"Fongicide","stade":"","surface_traitee":"","operateur":"","materiel":"","meteo":"","delai_rentree":"","justification":"","confiance":"haute","champs_manquants":[]}`}]})});
+        const d=await resp.json();
+        const p=JSON.parse(d.content?.[0]?.text.replace(/```json|```/g,"").trim()||"{}");
+        setDicteeRes(p);
+        setFI(f=>({...f,...Object.fromEntries(Object.entries(p).filter(([k,v])=>v&&!["confiance","champs_manquants"].includes(k)).map(([k,v])=>[k,String(v)]))}));
+      }catch{setDicteeRes({erreur:"Erreur d'analyse."});}
+      setDicteeLoad(false);
+    };
+    r.onerror=()=>setDicteeOn(false);r.onend=()=>setDicteeOn(false);
+    dicteeRef.current=r;r.start();setDicteeOn(true);setDicteeTexte("");setDicteeRes(null);
+  };
+
+  const sendChat=async()=>{
+    const msg=chatIn.trim();if(!msg||chatLoad)return;
+    setChatIn("");setMsgs(m=>[...m,{role:"user",text:msg}]);setChatLoad(true);
+    try{
+      const r=await fetch("https://api.anthropic.com/v1/messages",{method:"POST",headers:{"Content-Type":"application/json","anthropic-dangerous-request-proxy":"true"},body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:1000,system:"Tu es conseiller agricole expert en reglementation phytosanitaire française pour FacilPhyto. Reponds en français, pratique et concis.",messages:[...msgs.map(m=>({role:m.role==="assistant"?"assistant":"user",content:m.text})),{role:"user",content:msg}]})});
+      if(!r.ok){throw new Error("HTTP "+r.status);}
+      const d=await r.json();
+      setMsgs(m=>[...m,{role:"assistant",text:d.content?.[0]?.text||"Désolé, erreur."}]);
+    }catch(e){setMsgs(m=>[...m,{role:"assistant",text:"⚠️ Le conseiller IA n'est pas disponible pour le moment. Pour toute question réglementaire, contactez votre Chambre d'Agriculture ou consultez e-phy.franceagrimer.fr"}]);}
+    setChatLoad(false);
+  };
+
+  const startChatVoice=()=>{
+    const SR=window.SpeechRecognition||window.webkitSpeechRecognition;if(!SR)return;
+    const r=new SR();r.lang="fr-FR";r.interimResults=false;
+    r.onresult=e=>{setChatIn(e.results[0][0].transcript);setChatVoice(false);};
+    r.onerror=()=>setChatVoice(false);r.onend=()=>setChatVoice(false);
+    chatVRef.current=r;r.start();setChatVoice(true);
+  };
+
+  const today=new Date();
+  const expSt=d=>{if(!d)return"unknown";const diff=Math.ceil((new Date(d)-today)/86400000);return diff<0?"expired":diff<=90?"warning":"ok";};
+  const EC={expired:"#c0392b",warning:"#e67e22",ok:"#27ae60",unknown:"#999"};
+  const EL={expired:"Expiré !",warning:"Expire bientôt",ok:"Valide",unknown:"—"};
+  const nbAlerts=certiphytos.filter(c=>["expired","warning"].includes(expSt(c.date_expiration))).length;
+
+  const annees=[...new Set(interventions.map(i=>i.date?.split("-")[0]).filter(Boolean))].sort((a,b)=>b-a);
+  const interByAnnee=interventions.filter(i=>i.date?.startsWith(annee));
+
+  const TABS=[["dashboard","📊","Tableau de bord"],["parcelles","🗺️","Parcelles"],["registre","📋","Registre phyto"],["archives","📅","Archives"],["assolement","🌱","Assolement"],["certiphyto","🎓","Certiphyto"],["conseil","🤖","Conseiller IA"]];
+  
+  // Assolement state
+  const [assolements,setAssolements]=useState([]);
+  const [showFA,setShowFA]=useState(false);
+  const [anneeAsso,setAnneeAsso]=useState(new Date().getFullYear().toString());
+  const emptyA={parcelle_id:"",annee:new Date().getFullYear().toString(),culture:"",surface:""};
+  const [fA,setFA]=useState(emptyA);
+
+  useEffect(()=>{if(user)loadAssolements();},[user]);
+  const loadAssolements=async()=>{
+    const{data}=await supabase.from("assolements").select("*").eq("user_id",user.id).order("annee",{ascending:false});
+    setAssolements(data||[]);
+  };
+  const addA=async()=>{
+    if(!fA.parcelle_id||!fA.culture||!fA.surface)return;
+    const{error}=await supabase.from("assolements").insert({...fA,surface:parseFloat(fA.surface),user_id:user.id});
+    if(!error){await loadAssolements();setFA(emptyA);setShowFA(false);showSave();}
+  };
+  const delA=async(id)=>{await supabase.from("assolements").delete().eq("id",id);await loadAssolements();};
+
+  if(loading)return <div style={{display:"flex",alignItems:"center",justifyContent:"center",height:"100vh",fontSize:18,color:"#1a3a1a"}}>⟳ Chargement...</div>;
+  if(!user)return <LoginScreen onLogin={setUser}/>;
+
+  return(
+    <div style={{fontFamily:"Georgia,serif",background:"#f5f0e8",minHeight:"100vh",color:"#2d2a22"}}>
+      <style>{`@keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}`}</style>
+
+      {saveMsg&&<div style={{position:"fixed",top:16,right:16,background:"#27ae60",color:"white",padding:"12px 20px",borderRadius:10,fontWeight:"bold",fontSize:14,zIndex:999,boxShadow:"0 4px 12px rgba(0,0,0,.2)"}}>{saveMsg}</div>}
+
+      <div style={{background:"#1a3a1a",padding:"0 16px",display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:8,boxShadow:"0 2px 8px rgba(0,0,0,.3)"}}>
+        <div style={{display:"flex",alignItems:"center",gap:10,padding:"10px 0"}}>
+          <span style={{fontSize:24}}>🌾</span>
+          <div><div style={{color:"#d4a843",fontWeight:"bold",fontSize:17,letterSpacing:1}}>FacilPhyto</div><div style={{color:"#8aaa6a",fontSize:10}}>par Facil'Gestion31</div></div>
+        </div>
+        <div style={{display:"flex",gap:3,flexWrap:"wrap",alignItems:"center"}}>
+          {TABS.map(([key,icon,label])=>(
+            <button key={key} onClick={()=>setTab(key)} style={{background:tab===key?"#d4a843":"transparent",color:tab===key?"#1a3a1a":"#8aaa6a",border:"none",borderRadius:6,padding:"6px 9px",cursor:"pointer",fontFamily:"inherit",fontWeight:tab===key?"bold":"normal",fontSize:11,display:"flex",alignItems:"center",gap:3,position:"relative"}}>
+              {icon} {label}
+              {key==="certiphyto"&&nbAlerts>0&&<span style={{background:"#c0392b",color:"white",borderRadius:"50%",width:13,height:13,fontSize:8,display:"flex",alignItems:"center",justifyContent:"center",position:"absolute",top:1,right:1}}>{nbAlerts}</span>}
+            </button>
+          ))}
+          <button onClick={()=>supabase.auth.signOut()} style={{background:"transparent",color:"#c0392b",border:"1px solid #c0392b",borderRadius:6,padding:"6px 9px",cursor:"pointer",fontFamily:"inherit",fontSize:11,marginLeft:4}}>Déconnexion</button>
+        </div>
+      </div>
+
+      <div style={{maxWidth:1100,margin:"0 auto",padding:"18px 14px"}}>
+
+        {/* DASHBOARD */}
+        {tab==="dashboard"&&(
+          <div>
+            <h2 style={{color:"#1a3a1a",marginBottom:16,fontSize:20}}>Tableau de bord — Campagne {new Date().getFullYear()}</h2>
+            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:12,marginBottom:20}}>
+              {[{l:"Surface",v:`${parcelles.reduce((s,p)=>s+parseFloat(p.surface||0),0).toFixed(1)} ha`,i:"🗺️",c:"#2d6a2d"},{l:"Parcelles",v:parcelles.length,i:"📍",c:"#1a5a8a"},{l:"Interventions",v:interventions.length,i:"🧴",c:"#8a4a1a"},{l:"Certiphytos",v:certiphytos.length,i:"🎓",c:"#6a2d8a"},{l:"Alertes",v:nbAlerts,i:nbAlerts>0?"🚨":"✅",c:nbAlerts>0?"#c0392b":"#27ae60"}].map(c=>(
+                <div key={c.l} style={{background:"white",borderRadius:12,padding:"14px 16px",borderLeft:`4px solid ${c.c}`,boxShadow:"0 2px 8px rgba(0,0,0,.08)"}}>
+                  <div style={{fontSize:22,marginBottom:4}}>{c.i}</div>
+                  <div style={{fontSize:20,fontWeight:"bold",color:c.c}}>{c.v}</div>
+                  <div style={{fontSize:11,color:"#666"}}>{c.l}</div>
+                </div>
+              ))}
+            </div>
+            <div style={{background:"linear-gradient(135deg,#1a3a1a,#2d6a2d)",borderRadius:14,padding:"18px 22px",marginBottom:18,color:"white"}}>
+              <div style={{fontSize:16,fontWeight:"bold",marginBottom:5}}>🎙 Dictée intelligente</div>
+              <div style={{fontSize:12,opacity:.85,marginBottom:10}}>Parlez une seule fois et l'IA remplit tout le formulaire automatiquement.</div>
+              <div style={{background:"rgba(255,255,255,.1)",borderRadius:8,padding:"8px 12px",fontSize:11,fontStyle:"italic",marginBottom:12}}>💬 <em>"J'ai traité les Sablons avec du Callisto, 1 litre par hectare, 8 hectares, herbicide, vent faible"</em></div>
+              <button onClick={()=>setTab("registre")} style={{background:"#d4a843",color:"#1a3a1a",border:"none",borderRadius:8,padding:"8px 18px",cursor:"pointer",fontFamily:"inherit",fontWeight:"bold",fontSize:13}}>Essayer → Registre phyto</button>
+            </div>
+            {nbAlerts>0&&<div style={{background:"#fdf0f0",border:"2px solid #c0392b",borderRadius:12,padding:14,marginBottom:14}}>
+              <div style={{fontWeight:"bold",color:"#c0392b",marginBottom:6}}>🚨 Certiphyto(s) à renouveler</div>
+              {certiphytos.filter(c=>["expired","warning"].includes(expSt(c.date_expiration))).map(c=>(
+                <div key={c.id} style={{fontSize:13,color:"#555",padding:"2px 0"}}>→ <strong>{c.titulaire}</strong> — {EL[expSt(c.date_expiration)]} ({c.date_expiration})</div>
+              ))}
+            </div>}
+            <div style={{background:"#fffbf0",border:"2px solid #d4a843",borderRadius:12,padding:14}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8,flexWrap:"wrap",gap:8}}>
+              <div style={{fontWeight:"bold",color:"#8a6a00",fontSize:13}}>⚖️ Obligations réglementaires</div>
+              <button onClick={()=>exportAllData(parcelles,interventions,certiphytos,assolements)} style={{background:"#1a5a8a",color:"white",border:"none",borderRadius:8,padding:"7px 14px",cursor:"pointer",fontFamily:"inherit",fontWeight:"bold",fontSize:12}}>📥 Exporter mes données</button>
+            </div>
+              {[["✅","Registre numérique obligatoire au 01/01/2027","Règlement UE 2023/564"],["✅","Saisie dans les 30 jours","Max 31/01 année suivante"],["✅","Certiphyto — renouvellement 5 ans","Obligatoire achat + utilisation"],["⚠️","Bilan DPHY annuel","En ligne avant le 31/05"]].map(([i,t,d])=>(
+                <div key={t} style={{display:"flex",gap:8,padding:"5px 0",borderBottom:"1px solid #f0e8cc"}}>
+                  <span>{i}</span><div><div style={{fontWeight:"600",fontSize:12}}>{t}</div><div style={{fontSize:10,color:"#888"}}>{d}</div></div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* PARCELLES */}
+        {tab==="parcelles"&&(
+          <div>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}>
+              <h2 style={{color:"#1a3a1a",fontSize:20,margin:0}}>Mes Parcelles 🗺️</h2>
+              <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+              <label style={{background:"#d4a843",color:"#1a3a1a",border:"none",borderRadius:8,padding:"8px 14px",cursor:"pointer",fontFamily:"inherit",fontWeight:"bold",fontSize:12,display:"flex",alignItems:"center",gap:6}}>
+                📁 Importer TéléPAC (XML)
+                <input type="file" accept=".xml" style={{display:"none"}} onChange={e=>{
+                  const file=e.target.files[0];
+                  if(!file)return;
+                  const reader=new FileReader();
+                  reader.onload=ev=>importTelePAC(ev.target.result,parcelles,setParcelles,user.id,supabase,showSave,loadData);
+                  reader.readAsText(file);
+                  e.target.value="";
+                }}/>
+              </label>
+              <button onClick={()=>setShowFP(!showFP)} style={{background:"#2d6a2d",color:"white",border:"none",borderRadius:8,padding:"8px 14px",cursor:"pointer",fontFamily:"inherit",fontWeight:"bold",fontSize:12}}>+ Saisie manuelle</button>
+            </div>
+            </div>
+            <div style={{background:"linear-gradient(135deg,#8a6a00,#d4a843)",borderRadius:10,padding:"10px 16px",marginBottom:14,color:"white",fontSize:12}}>
+            📁 <strong>Nouveau !</strong> Importez vos parcelles directement depuis votre dossier <strong>TéléPAC (fichier XML)</strong> en un seul clic — plus besoin de tout resaisir !
+          </div>
+          {showFP&&<div style={{background:"white",borderRadius:12,padding:20,marginBottom:18,border:"2px solid #2d6a2d",boxShadow:"0 4px 16px rgba(0,0,0,.1)"}}>
+              <div style={{fontWeight:"bold",marginBottom:12,color:"#1a3a1a"}}>➕ Ajouter une parcelle</div>
+              <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(180px,1fr))",gap:12}}>
+                {[["nom","Nom *"],["surface","Surface (ha) *"],["ilot","N° îlot PAC"],["commune","Commune"]].map(([k,l])=>(
+                  <FM key={k} label={l} onVoice={v=>setFP(f=>({...f,[k]:v}))}><input value={fP[k]||""} onChange={e=>setFP(f=>({...f,[k]:e.target.value}))} style={{...IS,flex:1}}/></FM>
+                ))}
+                <div><label style={{display:"block",fontSize:12,fontWeight:"600",marginBottom:4,color:"#555"}}>Culture</label><select value={fP.culture||""} onChange={e=>setFP(f=>({...f,culture:e.target.value}))} style={IS}><option value="">--</option>{CULTURES.map(c=><option key={c}>{c}</option>)}</select></div>
+              </div>
+              <div style={{display:"flex",gap:10,marginTop:12}}>
+                <button onClick={addP} style={{background:"#2d6a2d",color:"white",border:"none",borderRadius:8,padding:"8px 20px",cursor:"pointer",fontFamily:"inherit",fontWeight:"bold"}}>✅ Enregistrer</button>
+                <button onClick={()=>setShowFP(false)} style={{background:"#e8e0d0",color:"#555",border:"none",borderRadius:8,padding:"8px 16px",cursor:"pointer",fontFamily:"inherit"}}>Annuler</button>
+              </div>
+            </div>}
+            {parcelles.length===0&&<div style={{background:"white",borderRadius:12,padding:36,textAlign:"center",color:"#aaa"}}>Aucune parcelle — Ajoutez votre première parcelle !</div>}
+            <div style={{display:"grid",gap:12}}>
+              {parcelles.map(p=>(
+                <div key={p.id} style={{background:"white",borderRadius:12,padding:"16px 20px",boxShadow:"0 2px 8px rgba(0,0,0,.08)",display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:8}}>
+                  <div style={{display:"flex",alignItems:"center",gap:12}}>
+                    <div style={{background:"#e8f5e8",borderRadius:10,width:42,height:42,display:"flex",alignItems:"center",justifyContent:"center",fontSize:18}}>🌿</div>
+                    <div><div style={{fontWeight:"bold",fontSize:14}}>{p.nom}</div><div style={{color:"#666",fontSize:11}}>{p.commune} · Îlot {p.ilot||"—"}</div></div>
+                  </div>
+                  <div style={{display:"flex",gap:14,textAlign:"center",alignItems:"center"}}>
+                    <div><div style={{fontWeight:"bold",color:"#2d6a2d"}}>{p.surface} ha</div><div style={{fontSize:10,color:"#999"}}>Surface</div></div>
+                    <div><div style={{fontWeight:"bold",color:"#8a4a1a"}}>{interventions.filter(i=>i.parcelle_id===p.id).length}</div><div style={{fontSize:10,color:"#999"}}>Interventions</div></div>
+                    <span style={{background:"#fff3e0",color:"#8a5a00",padding:"2px 8px",borderRadius:16,fontSize:11,fontWeight:"600"}}>{p.culture||"—"}</span>
+                    <button onClick={()=>delP(p.id)} style={{background:"none",border:"1px solid #eee",borderRadius:6,padding:"2px 8px",cursor:"pointer",fontSize:11,color:"#c0392b",fontFamily:"inherit"}}>🗑</button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* REGISTRE */}
+        {tab==="registre"&&(
+          <div>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16,flexWrap:"wrap",gap:8}}>
+              <h2 style={{color:"#1a3a1a",fontSize:20,margin:0}}>Registre des traitements</h2>
+              <div style={{display:"flex",gap:8}}>
+                <button onClick={()=>printRegistre(interventions,parcelles)} style={{background:"#1a5a8a",color:"white",border:"none",borderRadius:8,padding:"8px 14px",cursor:"pointer",fontFamily:"inherit",fontWeight:"bold",fontSize:12}}>🖨️ Imprimer</button>
+                <button onClick={()=>{setShowFI(!showFI);setDicteeTexte("");setDicteeRes(null);}} style={{background:"#8a4a1a",color:"white",border:"none",borderRadius:8,padding:"8px 16px",cursor:"pointer",fontFamily:"inherit",fontWeight:"bold",fontSize:13}}>+ Saisir traitement</button>
+              </div>
+            </div>
+            {showFI&&<div style={{background:"white",borderRadius:14,padding:22,marginBottom:20,border:"2px solid #8a4a1a",boxShadow:"0 4px 20px rgba(0,0,0,.12)"}}>
+              <div style={{background:"linear-gradient(135deg,#1a3a1a,#2d6a2d)",borderRadius:12,padding:"14px 18px",marginBottom:16,color:"white"}}>
+                <div style={{fontSize:14,fontWeight:"bold",marginBottom:4}}>🎙 Dictée intelligente</div>
+                <div style={{fontSize:11,opacity:.8,marginBottom:8}}>Parlez une seule fois → l'IA remplit tous les champs.</div>
+                <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
+                  <button onClick={dicteeOn?()=>{dicteeRef.current?.stop();setDicteeOn(false);}:startDictee}
+                    style={{background:dicteeOn?"#c0392b":"#d4a843",color:dicteeOn?"white":"#1a3a1a",border:"none",borderRadius:10,padding:"10px 16px",cursor:"pointer",fontFamily:"inherit",fontWeight:"bold",fontSize:13,animation:dicteeOn?"pulse 1s infinite":"none"}}>
+                    {dicteeOn?"⏹ Arrêter":"🎙 Parler pour remplir"}
+                  </button>
+                  {dicteeLoad&&<span style={{color:"#d4a843",fontSize:12}}>⟳ Analyse…</span>}
+                </div>
+                {dicteeOn&&<div style={{marginTop:6,fontSize:11,animation:"pulse 1s infinite",color:"#d4a843"}}>🔴 Parlez maintenant…</div>}
+                {dicteeTexte&&!dicteeLoad&&<div style={{marginTop:8,background:"rgba(255,255,255,.15)",borderRadius:8,padding:"6px 10px",fontSize:11,fontStyle:"italic"}}>"{dicteeTexte}"</div>}
+                {dicteeRes&&!dicteeRes.erreur&&<div style={{marginTop:6,background:"rgba(255,255,255,.15)",borderRadius:8,padding:"6px 10px",fontSize:11}}>
+                  <span style={{fontWeight:"bold",color:"#d4a843"}}>✅ Formulaire rempli !</span>
+                  {dicteeRes.champs_manquants?.length>0&&<span style={{color:"#ffd700",marginLeft:8}}>⚠️ À compléter : {dicteeRes.champs_manquants.join(", ")}</span>}
+                </div>}
+              </div>
+              <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(240px,1fr))",gap:12}}>
+                <div><label style={{display:"block",fontSize:12,fontWeight:"600",marginBottom:4,color:"#555"}}>Parcelle *</label><select value={fI.parcelle_id} onChange={e=>setFI(f=>({...f,parcelle_id:e.target.value}))} style={IS}><option value="">--</option>{parcelles.map(p=><option key={p.id} value={p.id}>{p.nom}</option>)}</select></div>
+                <div><label style={{display:"block",fontSize:12,fontWeight:"600",marginBottom:4,color:"#555"}}>Date *</label><input type="date" value={fI.date} onChange={e=>setFI(f=>({...f,date:e.target.value}))} style={IS}/></div>
+                <div>
+                  <label style={{display:"block",fontSize:12,fontWeight:"600",marginBottom:4,color:"#555"}}>Produit * <span style={{color:"#27ae60",fontSize:10}}>✅ e-phy intégré</span></label>
+                  <div style={{display:"flex",gap:6,position:"relative"}}>
+                    <div style={{flex:1,position:"relative"}}>
+                      <input value={fI.produit} onChange={e=>{
+                        const val=e.target.value;
+                        setFI(f=>({...f,produit:val}));
+                        if(val.length>=2){
+                          const found=EPHY_PRODUCTS.find(p=>p.nom.toLowerCase()===val.toLowerCase());
+                          if(found){setFI(f=>({...f,produit:found.nom,numero_amm:found.amm,cible:found.cible,unite:found.unite,delai_rentree:String(found.dar)}));}
+                        }
+                      }} placeholder="Tapez le nom du produit..." list="ephy-list" style={{...IS,width:"100%"}}/>
+                      <datalist id="ephy-list">{EPHY_PRODUCTS.map(p=><option key={p.amm} value={p.nom}>{p.nom} — AMM {p.amm}</option>)}</datalist>
+                    </div>
+                    <MicBtn onResult={v=>{setFI(f=>({...f,produit:v}));const found=EPHY_PRODUCTS.find(p=>p.nom.toLowerCase()===v.toLowerCase());if(found){setFI(f=>({...f,produit:found.nom,numero_amm:found.amm,cible:found.cible,unite:found.unite,delai_rentree:String(found.dar)}));} }}/>
+                  </div>
+                  {fI.numero_amm&&<div style={{fontSize:11,color:"#27ae60",marginTop:3}}>✅ AMM {fI.numero_amm} — {fI.cible} — DAR {fI.delai_rentree}h détecté automatiquement</div>}
+                </div>
+                <FM label="N° AMM" onVoice={v=>setFI(f=>({...f,numero_amm:v}))}><input value={fI.numero_amm} onChange={e=>setFI(f=>({...f,numero_amm:e.target.value}))} style={{...IS,flex:1}}/></FM>
+                <div><label style={{display:"block",fontSize:12,fontWeight:"600",marginBottom:4,color:"#555"}}>Cible *</label><select value={fI.cible} onChange={e=>setFI(f=>({...f,cible:e.target.value}))} style={IS}>{CIBLES.map(c=><option key={c}>{c}</option>)}</select></div>
+                <div><label style={{display:"block",fontSize:12,fontWeight:"600",marginBottom:4,color:"#555"}}>Stade</label><select value={fI.stade} onChange={e=>setFI(f=>({...f,stade:e.target.value}))} style={IS}><option value="">--</option>{STADES.map(s=><option key={s}>{s}</option>)}</select></div>
+                <div style={{display:"flex",gap:6}}>
+                  <FM label="Dose *" onVoice={v=>setFI(f=>({...f,dose:v.replace(",",".")}))}><input type="number" value={fI.dose} onChange={e=>setFI(f=>({...f,dose:e.target.value}))} step="0.01" style={{...IS,flex:1}}/></FM>
+                  <div style={{width:80,flexShrink:0}}><label style={{display:"block",fontSize:12,fontWeight:"600",marginBottom:4,color:"#555"}}>Unité</label><select value={fI.unite} onChange={e=>setFI(f=>({...f,unite:e.target.value}))} style={{...IS,width:"100%"}}>{UNITES.map(u=><option key={u}>{u}</option>)}</select></div>
+                </div>
+                <FM label="Surface (ha) *" onVoice={v=>setFI(f=>({...f,surface_traitee:v.replace(",",".")}))}><input type="number" value={fI.surface_traitee} onChange={e=>setFI(f=>({...f,surface_traitee:e.target.value}))} step="0.1" style={{...IS,flex:1}}/></FM>
+                <FM label="Opérateur *" onVoice={v=>setFI(f=>({...f,operateur:v}))}><input value={fI.operateur} onChange={e=>setFI(f=>({...f,operateur:e.target.value}))} style={{...IS,flex:1}}/></FM>
+                <FM label="Matériel" onVoice={v=>setFI(f=>({...f,materiel:v}))}><input value={fI.materiel} onChange={e=>setFI(f=>({...f,materiel:e.target.value}))} style={{...IS,flex:1}}/></FM>
+                <FM label="Météo *" onVoice={v=>setFI(f=>({...f,meteo:v}))}><input value={fI.meteo} onChange={e=>setFI(f=>({...f,meteo:e.target.value}))} placeholder="Vent, T°" style={{...IS,flex:1}}/></FM>
+                <FM label="DAR (h)" onVoice={v=>setFI(f=>({...f,delai_rentree:v}))}><input type="number" value={fI.delai_rentree} onChange={e=>setFI(f=>({...f,delai_rentree:e.target.value}))} style={{...IS,flex:1}}/></FM>
+                <div style={{gridColumn:"1/-1"}}><FM label="Justification *" onVoice={v=>setFI(f=>({...f,justification:v}))}><textarea value={fI.justification} onChange={e=>setFI(f=>({...f,justification:e.target.value}))} rows={2} style={{...IS,flex:1,resize:"vertical"}}/></FM></div>
+              </div>
+              <div style={{display:"flex",gap:10,marginTop:14}}>
+                <button onClick={addI} style={{background:"#8a4a1a",color:"white",border:"none",borderRadius:8,padding:"9px 22px",cursor:"pointer",fontFamily:"inherit",fontWeight:"bold",fontSize:14}}>✅ Enregistrer</button>
+                <button onClick={()=>{setShowFI(false);setFI(emptyI);}} style={{background:"#e8e0d0",color:"#555",border:"none",borderRadius:8,padding:"9px 16px",cursor:"pointer",fontFamily:"inherit"}}>Annuler</button>
+              </div>
+            </div>}
+            <div style={{background:"white",borderRadius:12,overflow:"hidden",boxShadow:"0 2px 8px rgba(0,0,0,.08)"}}>
+              <div style={{overflowX:"auto"}}>
+                <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
+                  <thead><tr style={{background:"#1a3a1a",color:"#d4a843"}}>{["Date","Parcelle","Produit","Cible","Dose","Surface","Opérateur","Météo","Motif",""].map(h=><th key={h} style={{padding:"10px 12px",textAlign:"left",whiteSpace:"nowrap"}}>{h}</th>)}</tr></thead>
+                  <tbody>
+                    {interventions.length===0&&<tr><td colSpan={10} style={{padding:28,textAlign:"center",color:"#aaa"}}>Aucun traitement enregistré</td></tr>}
+                    {interventions.map((i,idx)=>{const p=parcelles.find(p=>p.id===i.parcelle_id);return(
+                      <tr key={i.id} style={{background:idx%2===0?"#faf8f4":"white",borderBottom:"1px solid #f0ebe0"}}>
+                        <td style={{padding:"8px 12px",whiteSpace:"nowrap"}}>{i.date}</td>
+                        <td style={{padding:"8px 12px",fontWeight:"600"}}>{p?.nom||"—"}</td>
+                        <td style={{padding:"8px 12px",color:"#8a4a1a",fontWeight:"600"}}>{i.produit}</td>
+                        <td style={{padding:"8px 12px"}}><span style={{background:i.cible==="Fongicide"?"#e8f5e8":i.cible==="Herbicide"?"#fff3e0":"#fce4ec",padding:"2px 7px",borderRadius:10,fontSize:11}}>{i.cible}</span></td>
+                        <td style={{padding:"8px 12px",whiteSpace:"nowrap"}}>{i.dose} {i.unite}</td>
+                        <td style={{padding:"8px 12px",whiteSpace:"nowrap"}}>{i.surface_traitee} ha</td>
+                        <td style={{padding:"8px 12px"}}>{i.operateur}</td>
+                        <td style={{padding:"8px 12px",color:"#666",maxWidth:90,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{i.meteo}</td>
+                        <td style={{padding:"8px 12px",color:"#555",maxWidth:110,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{i.justification}</td>
+                        <td style={{padding:"8px 12px"}}><button onClick={()=>delI(i.id)} style={{background:"none",border:"none",cursor:"pointer",color:"#c0392b",fontSize:13}}>🗑</button></td>
+                      </tr>
+                    );})}
+                  </tbody>
+                </table>
+              </div>
+              <div style={{padding:"8px 12px",background:"#f5f0e8",fontSize:10,color:"#888",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                <span>📌 Conforme Règlement UE 2023/564 · Conservation 5 ans · {interventions.length} entrée(s)</span>
+                <button onClick={()=>printRegistre(interventions,parcelles)} style={{background:"#1a5a8a",color:"white",border:"none",borderRadius:6,padding:"4px 10px",cursor:"pointer",fontSize:10,fontFamily:"inherit"}}>🖨️ Imprimer</button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ARCHIVES */}
+        {tab==="archives"&&(
+          <div>
+            <h2 style={{color:"#1a3a1a",fontSize:20,marginBottom:16}}>📅 Archives par année</h2>
+            <div style={{background:"#fffbf0",border:"1px solid #d4a843",borderRadius:8,padding:"10px 14px",marginBottom:16,fontSize:12,color:"#8a6a00"}}>
+              ⚖️ Le registre phytosanitaire doit être conservé <strong>5 ans minimum</strong> (art. L254-7 CRPM). Toutes vos données sont sauvegardées automatiquement.
+            </div>
+            <div style={{display:"flex",gap:8,marginBottom:18,flexWrap:"wrap"}}>
+              {annees.length===0&&<div style={{color:"#888",fontSize:13}}>Aucune intervention enregistrée pour le moment.</div>}
+              {annees.map(a=>(
+                <button key={a} onClick={()=>setAnnee(a)} style={{background:annee===a?"#1a3a1a":"white",color:annee===a?"#d4a843":"#555",border:"2px solid",borderColor:annee===a?"#1a3a1a":"#e0d8c8",borderRadius:8,padding:"8px 16px",cursor:"pointer",fontFamily:"inherit",fontWeight:annee===a?"bold":"normal",fontSize:13}}>
+                  📅 {a} ({interventions.filter(i=>i.date?.startsWith(a)).length})
+                </button>
+              ))}
+            </div>
+            {annees.length>0&&<div>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
+                <div style={{fontWeight:"bold",color:"#1a3a1a",fontSize:15}}>Campagne {annee} — {interByAnnee.length} traitement(s)</div>
+                <button onClick={()=>printRegistre(interByAnnee,parcelles)} style={{background:"#1a5a8a",color:"white",border:"none",borderRadius:8,padding:"8px 14px",cursor:"pointer",fontFamily:"inherit",fontWeight:"bold",fontSize:12}}>🖨️ Imprimer {annee}</button>
+              </div>
+              <div style={{background:"white",borderRadius:12,overflow:"hidden",boxShadow:"0 2px 8px rgba(0,0,0,.08)"}}>
+                <div style={{overflowX:"auto"}}>
+                  <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
+                    <thead><tr style={{background:"#1a3a1a",color:"#d4a843"}}>{["Date","Parcelle","Produit","Cible","Dose","Surface","Opérateur","Motif"].map(h=><th key={h} style={{padding:"10px 12px",textAlign:"left",whiteSpace:"nowrap"}}>{h}</th>)}</tr></thead>
+                    <tbody>
+                      {interByAnnee.length===0&&<tr><td colSpan={8} style={{padding:24,textAlign:"center",color:"#aaa"}}>Aucun traitement en {annee}</td></tr>}
+                      {interByAnnee.map((i,idx)=>{const p=parcelles.find(p=>p.id===i.parcelle_id);return(
+                        <tr key={i.id} style={{background:idx%2===0?"#faf8f4":"white",borderBottom:"1px solid #f0ebe0"}}>
+                          <td style={{padding:"8px 12px"}}>{i.date}</td>
+                          <td style={{padding:"8px 12px",fontWeight:"600"}}>{p?.nom||"—"}</td>
+                          <td style={{padding:"8px 12px",color:"#8a4a1a",fontWeight:"600"}}>{i.produit}</td>
+                          <td style={{padding:"8px 12px"}}>{i.cible}</td>
+                          <td style={{padding:"8px 12px"}}>{i.dose} {i.unite}</td>
+                          <td style={{padding:"8px 12px"}}>{i.surface_traitee} ha</td>
+                          <td style={{padding:"8px 12px"}}>{i.operateur}</td>
+                          <td style={{padding:"8px 12px",maxWidth:150,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{i.justification}</td>
+                        </tr>
+                      );})}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>}
+          </div>
+        )}
+
+        {/* ASSOLEMENT */}
+        {tab==="assolement"&&(
+          <div>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16,flexWrap:"wrap",gap:8}}>
+              <h2 style={{color:"#1a3a1a",fontSize:20,margin:0}}>🌱 Assolement PAC</h2>
+              <button onClick={()=>setShowFA(!showFA)} style={{background:"#2d6a2d",color:"white",border:"none",borderRadius:8,padding:"8px 16px",cursor:"pointer",fontFamily:"inherit",fontWeight:"bold",fontSize:13}}>+ Saisir assolement</button>
+            </div>
+
+            <div style={{background:"#fffbf0",border:"1px solid #d4a843",borderRadius:8,padding:"10px 14px",marginBottom:16,fontSize:12,color:"#8a6a00"}}>
+              📋 Suivi des cultures par parcelle et par campagne — conforme déclaration PAC
+            </div>
+
+            {showFA&&<div style={{background:"white",borderRadius:12,padding:20,marginBottom:18,border:"2px solid #2d6a2d",boxShadow:"0 4px 16px rgba(0,0,0,.1)"}}>
+              <div style={{fontWeight:"bold",marginBottom:12,color:"#1a3a1a"}}>➕ Nouvel assolement</div>
+              <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(180px,1fr))",gap:12}}>
+                <div>
+                  <label style={{display:"block",fontSize:12,fontWeight:"600",marginBottom:4,color:"#555"}}>Parcelle *</label>
+                  <select value={fA.parcelle_id} onChange={e=>setFA(f=>({...f,parcelle_id:e.target.value}))} style={IS}>
+                    <option value="">-- Choisir --</option>
+                    {parcelles.map(p=><option key={p.id} value={p.id}>{p.nom}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label style={{display:"block",fontSize:12,fontWeight:"600",marginBottom:4,color:"#555"}}>Campagne *</label>
+                  <select value={fA.annee} onChange={e=>setFA(f=>({...f,annee:e.target.value}))} style={IS}>
+                    {[2022,2023,2024,2025,2026,2027].map(a=><option key={a}>{a}</option>)}
+                  </select>
+                </div>
+                <FM label="Culture *" onVoice={v=>setFA(f=>({...f,culture:v}))}>
+                  <select value={fA.culture} onChange={e=>setFA(f=>({...f,culture:e.target.value}))} style={{...IS,flex:1}}>
+                    <option value="">-- Choisir --</option>
+                    {CULTURES.map(c=><option key={c}>{c}</option>)}
+                  </select>
+                </FM>
+                <FM label="Surface (ha) *" onVoice={v=>setFA(f=>({...f,surface:v.replace(",",".")}))}>
+                  <input type="number" value={fA.surface} onChange={e=>setFA(f=>({...f,surface:e.target.value}))} step="0.1" style={{...IS,flex:1}}/>
+                </FM>
+              </div>
+              <div style={{display:"flex",gap:10,marginTop:12}}>
+                <button onClick={addA} style={{background:"#2d6a2d",color:"white",border:"none",borderRadius:8,padding:"8px 20px",cursor:"pointer",fontFamily:"inherit",fontWeight:"bold"}}>✅ Enregistrer</button>
+                <button onClick={()=>setShowFA(false)} style={{background:"#e8e0d0",color:"#555",border:"none",borderRadius:8,padding:"8px 16px",cursor:"pointer",fontFamily:"inherit"}}>Annuler</button>
+              </div>
+            </div>}
+
+            {/* Sélecteur année */}
+            <div style={{display:"flex",gap:8,marginBottom:16,flexWrap:"wrap"}}>
+              {[2022,2023,2024,2025,2026,2027].map(a=>(
+                <button key={a} onClick={()=>setAnneeAsso(String(a))} style={{background:anneeAsso===String(a)?"#1a3a1a":"white",color:anneeAsso===String(a)?"#d4a843":"#555",border:"2px solid",borderColor:anneeAsso===String(a)?"#1a3a1a":"#e0d8c8",borderRadius:8,padding:"7px 14px",cursor:"pointer",fontFamily:"inherit",fontWeight:anneeAsso===String(a)?"bold":"normal",fontSize:13}}>
+                  {a} ({assolements.filter(a2=>a2.annee===String(a)).length})
+                </button>
+              ))}
+            </div>
+
+            {/* Tableau assolement */}
+            <div style={{background:"white",borderRadius:12,overflow:"hidden",boxShadow:"0 2px 8px rgba(0,0,0,.08)"}}>
+              <div style={{padding:"12px 16px",background:"#1a3a1a",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                <div style={{color:"#d4a843",fontWeight:"bold",fontSize:14}}>Campagne {anneeAsso}</div>
+                <button onClick={()=>{
+                  const assoAnnee=assolements.filter(a=>a.annee===anneeAsso);
+                  const w=window.open("","_blank");
+                  const rows=assoAnnee.map(a=>{const p=parcelles.find(p=>p.id===a.parcelle_id);return`<tr><td>${p?.nom||"—"}</td><td>${p?.ilot||"—"}</td><td>${a.culture}</td><td>${a.surface} ha</td></tr>`;}).join("");
+                  w.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Assolement ${anneeAsso}</title><style>body{font-family:Arial;font-size:12px;margin:20px}h1{color:#1a3a1a;font-size:16px}table{width:100%;border-collapse:collapse}th{background:#1a3a1a;color:#d4a843;padding:8px}td{padding:7px;border-bottom:1px solid #eee}@media print{button{display:none}}</style></head><body><h1>🌱 Assolement PAC — Campagne ${anneeAsso}</h1><p style="font-size:10px;color:#666">${SOCIETE.nom} · ${SOCIETE.adresse} · SIRET ${SOCIETE.siret} · Édité le ${new Date().toLocaleDateString("fr-FR")}</p><table><thead><tr><th>Parcelle</th><th>N° Îlot PAC</th><th>Culture</th><th>Surface</th></tr></thead><tbody>${rows}</tbody></table><br><button onclick="window.print()">🖨️ Imprimer</button></body></html>`);
+                  w.document.close();setTimeout(()=>w.print(),300);
+                }} style={{background:"#d4a843",color:"#1a3a1a",border:"none",borderRadius:6,padding:"6px 14px",cursor:"pointer",fontFamily:"inherit",fontWeight:"bold",fontSize:12}}>🖨️ Export PAC {anneeAsso}</button>
+              </div>
+              <div style={{overflowX:"auto"}}>
+                <table style={{width:"100%",borderCollapse:"collapse",fontSize:13}}>
+                  <thead><tr style={{background:"#f5f0e8"}}>{["Parcelle","N° Îlot PAC","Culture","Surface",""].map(h=><th key={h} style={{padding:"10px 14px",textAlign:"left",color:"#555",fontWeight:"600"}}>{h}</th>)}</tr></thead>
+                  <tbody>
+                    {assolements.filter(a=>a.annee===anneeAsso).length===0&&<tr><td colSpan={5} style={{padding:28,textAlign:"center",color:"#aaa"}}>Aucun assolement pour {anneeAsso}</td></tr>}
+                    {assolements.filter(a=>a.annee===anneeAsso).map((a,idx)=>{
+                      const p=parcelles.find(p=>p.id===a.parcelle_id);
+                      return(
+                        <tr key={a.id} style={{background:idx%2===0?"#faf8f4":"white",borderBottom:"1px solid #f0ebe0"}}>
+                          <td style={{padding:"10px 14px",fontWeight:"600"}}>{p?.nom||"—"}</td>
+                          <td style={{padding:"10px 14px",color:"#666"}}>{p?.ilot||"—"}</td>
+                          <td style={{padding:"10px 14px"}}><span style={{background:"#e8f5e8",color:"#2d6a2d",padding:"3px 10px",borderRadius:16,fontSize:12,fontWeight:"600"}}>{a.culture}</span></td>
+                          <td style={{padding:"10px 14px",fontWeight:"bold",color:"#2d6a2d"}}>{a.surface} ha</td>
+                          <td style={{padding:"10px 14px"}}><button onClick={()=>delA(a.id)} style={{background:"none",border:"none",cursor:"pointer",color:"#c0392b",fontSize:13}}>🗑</button></td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+              {assolements.filter(a=>a.annee===anneeAsso).length>0&&<div style={{padding:"10px 14px",background:"#f5f0e8",fontSize:12,color:"#555",display:"flex",justifyContent:"space-between"}}>
+                <span>Total : <strong>{assolements.filter(a=>a.annee===anneeAsso).reduce((s,a)=>s+parseFloat(a.surface||0),0).toFixed(1)} ha</strong></span>
+                <span>{assolements.filter(a=>a.annee===anneeAsso).length} parcelle(s)</span>
+              </div>}
+            </div>
+
+            {/* Récap toutes années */}
+            {assolements.length>0&&<div style={{marginTop:20,background:"white",borderRadius:12,padding:18,boxShadow:"0 2px 8px rgba(0,0,0,.08)"}}>
+              <div style={{fontWeight:"bold",color:"#1a3a1a",marginBottom:12,fontSize:14}}>📊 Récapitulatif rotations — toutes campagnes</div>
+              <div style={{overflowX:"auto"}}>
+                <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
+                  <thead><tr style={{background:"#f5f0e8"}}>{["Parcelle",...[2022,2023,2024,2025,2026,2027].map(a=>String(a))].map(h=><th key={h} style={{padding:"8px 12px",textAlign:"left",color:"#555",fontWeight:"600",whiteSpace:"nowrap"}}>{h}</th>)}</tr></thead>
+                  <tbody>
+                    {parcelles.map((p,idx)=>(
+                      <tr key={p.id} style={{background:idx%2===0?"#faf8f4":"white",borderBottom:"1px solid #f0ebe0"}}>
+                        <td style={{padding:"8px 12px",fontWeight:"600"}}>{p.nom}</td>
+                        {[2022,2023,2024,2025,2026,2027].map(a=>{
+                          const asso=assolements.find(as=>as.parcelle_id===p.id&&as.annee===String(a));
+                          return <td key={a} style={{padding:"8px 12px",color:asso?"#2d6a2d":"#ccc",fontSize:11}}>{asso?asso.culture:"—"}</td>;
+                        })}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>}
+          </div>
+        )}
+
+        {/* CERTIPHYTO */}
+        {tab==="certiphyto"&&(
+          <div>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
+              <h2 style={{color:"#1a3a1a",fontSize:20,margin:0}}>🎓 Gestion des Certiphytos</h2>
+              <button onClick={()=>setShowFC(!showFC)} style={{background:"#6a2d8a",color:"white",border:"none",borderRadius:8,padding:"8px 16px",cursor:"pointer",fontFamily:"inherit",fontWeight:"bold",fontSize:13}}>+ Ajouter</button>
+            </div>
+            <div style={{background:"#f0eaf8",border:"1px solid #c8a8e8",borderRadius:8,padding:"10px 14px",marginBottom:16,fontSize:12,color:"#5a2a7a"}}>
+              <strong>ℹ️</strong> Renouvellement obligatoire tous les <strong>5 ans</strong>. Sans Certiphyto valide, l'achat et l'utilisation de phyto est illégal.
+            </div>
+            {showFC&&<div style={{background:"white",borderRadius:12,padding:20,marginBottom:18,border:"2px solid #6a2d8a",boxShadow:"0 4px 16px rgba(0,0,0,.1)"}}>
+              <div style={{fontWeight:"bold",marginBottom:12,color:"#1a3a1a"}}>➕ Nouveau Certiphyto</div>
+              <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(180px,1fr))",gap:12}}>
+                <FM label="Titulaire *" onVoice={v=>setFC(f=>({...f,titulaire:v}))}><input value={fC.titulaire} onChange={e=>setFC(f=>({...f,titulaire:e.target.value}))} style={{...IS,flex:1}}/></FM>
+                <div><label style={{display:"block",fontSize:12,fontWeight:"600",marginBottom:4,color:"#555"}}>Type *</label><select value={fC.type} onChange={e=>setFC(f=>({...f,type:e.target.value}))} style={IS}>{CERT_TYPES.map(t=><option key={t}>{t}</option>)}</select></div>
+                <FM label="N° certificat *" onVoice={v=>setFC(f=>({...f,numero:v}))}><input value={fC.numero} onChange={e=>setFC(f=>({...f,numero:e.target.value}))} style={{...IS,flex:1}}/></FM>
+                <FM label="Organisme" onVoice={v=>setFC(f=>({...f,organisme:v}))}><input value={fC.organisme} onChange={e=>setFC(f=>({...f,organisme:e.target.value}))} style={{...IS,flex:1}}/></FM>
+                <div><label style={{display:"block",fontSize:12,fontWeight:"600",marginBottom:4,color:"#555"}}>Date obtention</label><input type="date" value={fC.date_obtention} onChange={e=>setFC(f=>({...f,date_obtention:e.target.value}))} style={IS}/></div>
+                <div><label style={{display:"block",fontSize:12,fontWeight:"600",marginBottom:4,color:"#555"}}>Date expiration *</label><input type="date" value={fC.date_expiration} onChange={e=>setFC(f=>({...f,date_expiration:e.target.value}))} style={IS}/></div>
+                <div style={{gridColumn:"1/-1"}}><FM label="Notes" onVoice={v=>setFC(f=>({...f,notes:v}))}><textarea value={fC.notes} onChange={e=>setFC(f=>({...f,notes:e.target.value}))} rows={2} style={{...IS,flex:1,resize:"vertical"}}/></FM></div>
+              </div>
+              <div style={{display:"flex",gap:10,marginTop:12}}>
+                <button onClick={addC} style={{background:"#6a2d8a",color:"white",border:"none",borderRadius:8,padding:"8px 20px",cursor:"pointer",fontFamily:"inherit",fontWeight:"bold"}}>✅ Enregistrer</button>
+                <button onClick={()=>setShowFC(false)} style={{background:"#e8e0d0",color:"#555",border:"none",borderRadius:8,padding:"8px 16px",cursor:"pointer",fontFamily:"inherit"}}>Annuler</button>
+              </div>
+            </div>}
+            {certiphytos.length===0&&<div style={{background:"white",borderRadius:12,padding:36,textAlign:"center",color:"#aaa"}}>Aucun Certiphyto enregistré.</div>}
+            <div style={{display:"grid",gap:12}}>
+              {certiphytos.map(c=>{
+                const st=expSt(c.date_expiration);
+                const dL=c.date_expiration?Math.ceil((new Date(c.date_expiration)-today)/86400000):null;
+                return(<div key={c.id} style={{background:"white",borderRadius:12,padding:"16px 20px",boxShadow:"0 2px 8px rgba(0,0,0,.08)",borderLeft:`5px solid ${EC[st]}`}}>
+                  <div style={{display:"flex",justifyContent:"space-between",flexWrap:"wrap",gap:8}}>
+                    <div style={{flex:1}}>
+                      <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:6}}>
+                        <span style={{fontSize:26}}>🎓</span>
+                        <div><div style={{fontWeight:"bold",fontSize:14}}>{c.titulaire}</div><div style={{color:"#6a2d8a",fontSize:11,fontWeight:"600"}}>{c.type}</div></div>
+                      </div>
+                      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(120px,1fr))",gap:4,fontSize:11,color:"#555"}}>
+                        <div><strong>N° :</strong> {c.numero||"—"}</div>
+                        <div><strong>Obtenu :</strong> {c.date_obtention||"—"}</div>
+                        <div><strong>Organisme :</strong> {c.organisme||"—"}</div>
+                      </div>
+                    </div>
+                    <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:6}}>
+                      <div style={{background:EC[st],color:"white",padding:"3px 10px",borderRadius:16,fontWeight:"bold",fontSize:11}}>{EL[st]}</div>
+                      {dL!==null&&<div style={{fontSize:11,color:EC[st],fontWeight:"600",textAlign:"right"}}>{dL>=0?`Dans ${dL} jours`:`Expiré depuis ${Math.abs(dL)} j`}<div style={{fontWeight:"normal",color:"#888",fontSize:10}}>{c.date_expiration}</div></div>}
+                      <button onClick={()=>delC(c.id)} style={{background:"none",border:"1px solid #eee",borderRadius:6,padding:"2px 8px",cursor:"pointer",fontSize:11,color:"#c0392b",fontFamily:"inherit"}}>🗑 Supprimer</button>
+                    </div>
+                  </div>
+                  {st==="expired"&&<div style={{marginTop:8,background:"#fdf0f0",border:"1px solid #c0392b",borderRadius:8,padding:"6px 12px",fontSize:11,color:"#c0392b"}}>🚨 <strong>Certiphyto expiré !</strong> Contactez votre Chambre d'Agriculture.</div>}
+                  {st==="warning"&&<div style={{marginTop:8,background:"#fff8f0",border:"1px solid #e67e22",borderRadius:8,padding:"6px 12px",fontSize:11,color:"#e67e22"}}>⚠️ Pensez à renouveler votre Certiphyto avant expiration.</div>}
+                </div>);
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* CONSEIL IA */}
+        {tab==="conseil"&&(
+          <div style={{display:"flex",flexDirection:"column",height:"calc(100vh - 160px)"}}>
+            <h2 style={{color:"#1a3a1a",fontSize:20,margin:"0 0 10px 0"}}>🤖 Conseiller IA FacilPhyto</h2>
+            <div style={{background:"#fffbf0",border:"1px solid #d4a843",borderRadius:8,padding:"8px 12px",marginBottom:10,fontSize:11,color:"#8a6a00"}}>
+              ⚠️ Conseils indicatifs. Ne remplace pas un conseiller agréé Certiphyto.
+            </div>
+            <div style={{flex:1,background:"white",borderRadius:12,padding:12,overflowY:"auto",boxShadow:"0 2px 8px rgba(0,0,0,.08)",marginBottom:8}}>
+              {msgs.map((m,i)=>(
+                <div key={i} style={{display:"flex",justifyContent:m.role==="user"?"flex-end":"flex-start",marginBottom:12}}>
+                  {m.role==="assistant"&&<div style={{width:26,height:26,background:"#1a3a1a",borderRadius:"50%",display:"flex",alignItems:"center",justifyContent:"center",fontSize:12,marginRight:6,flexShrink:0,marginTop:2}}>🌾</div>}
+                  <div style={{maxWidth:"78%",background:m.role==="user"?"#1a3a1a":"#f5f0e8",color:m.role==="user"?"white":"#2d2a22",borderRadius:m.role==="user"?"14px 14px 3px 14px":"14px 14px 14px 3px",padding:"9px 13px",fontSize:13,lineHeight:1.6,whiteSpace:"pre-wrap"}}>{m.text}</div>
+                </div>
+              ))}
+              {chatLoad&&<div style={{display:"flex",alignItems:"center",gap:6}}><div style={{width:26,height:26,background:"#1a3a1a",borderRadius:"50%",display:"flex",alignItems:"center",justifyContent:"center",fontSize:12}}>🌾</div><div style={{background:"#f5f0e8",borderRadius:14,padding:"8px 12px",color:"#888",fontSize:12}}>Analyse…</div></div>}
+              <div ref={chatEnd}/>
+            </div>
+            <div style={{display:"flex",flexWrap:"wrap",gap:6,marginBottom:8}}>
+              {["Certiphytos valides ?","Obligations 2027","Vérifier conformité","Bilan DPHY"].map(q=>(
+                <button key={q} onClick={()=>setChatIn(q)} style={{background:"#f0ebe0",border:"none",borderRadius:16,padding:"4px 10px",fontSize:11,cursor:"pointer",color:"#555",fontFamily:"inherit"}}>{q}</button>
+              ))}
+            </div>
+            <div style={{display:"flex",gap:8,alignItems:"center"}}>
+              <input value={chatIn} onChange={e=>setChatIn(e.target.value)} onKeyDown={e=>e.key==="Enter"&&!e.shiftKey&&sendChat()} placeholder="Écrivez ou utilisez le micro…" disabled={chatLoad}
+                style={{flex:1,padding:"10px 13px",border:"2px solid #d4a843",borderRadius:10,fontFamily:"inherit",fontSize:13,background:"white",outline:"none"}}/>
+              <button onClick={chatVoice?()=>{chatVRef.current?.stop();setChatVoice(false);}:startChatVoice}
+                style={{background:chatVoice?"#c0392b":"#2d6a2d",color:"white",border:"none",borderRadius:10,padding:"10px 12px",cursor:"pointer",fontSize:16,animation:chatVoice?"pulse 1s infinite":"none"}}>
+                {chatVoice?"⏹":"🎙"}
+              </button>
+              <button onClick={sendChat} disabled={chatLoad||!chatIn.trim()}
+                style={{background:chatLoad?"#ccc":"#1a3a1a",color:"white",border:"none",borderRadius:10,padding:"10px 18px",cursor:chatLoad?"not-allowed":"pointer",fontFamily:"inherit",fontWeight:"bold",fontSize:14}}>→</button>
+            </div>
+            {chatVoice&&<div style={{textAlign:"center",color:"#c0392b",fontSize:11,marginTop:4,animation:"pulse 1s infinite"}}>🔴 Enregistrement… parlez maintenant</div>}
+          </div>
+        )}
+      </div>
+
+      <div style={{background:"#1a3a1a",color:"#8aaa6a",textAlign:"center",padding:"14px",fontSize:10,marginTop:30}}>
+        FacilPhyto © {new Date().getFullYear()} — {SOCIETE.nom} · {SOCIETE.adresse} · SIRET {SOCIETE.siret} · <a href={`mailto:${SOCIETE.email}`} style={{color:"#d4a843"}}>{SOCIETE.email}</a>
+      </div>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
+</script>
+</body>
+</html>
