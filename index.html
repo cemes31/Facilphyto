@@ -388,7 +388,7 @@ function App(){
     const msg=chatIn.trim();if(!msg||chatLoad)return;
     setChatIn("");setMsgs(m=>[...m,{role:"user",text:msg}]);setChatLoad(true);
     try{
-      const r=await fetch("https://api.anthropic.com/v1/messages",{method:"POST",headers:{"Content-Type":"application/json","anthropic-dangerous-request-proxy":"true"},body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:1000,system:"Tu es conseiller agricole expert en reglementation phytosanitaire française pour FacilPhyto. Reponds en français, pratique et concis.",messages:[...msgs.map(m=>({role:m.role==="assistant"?"assistant":"user",content:m.text})),{role:"user",content:msg}]})});
+      const r=await fetch("/api/chat",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:1000,system:"Tu es conseiller agricole expert en reglementation phytosanitaire française pour FacilPhyto. Reponds en français, pratique et concis.",messages:[...msgs.map(m=>({role:m.role==="assistant"?"assistant":"user",content:m.text})),{role:"user",content:msg}]})});
       if(!r.ok){throw new Error("HTTP "+r.status);}
       const d=await r.json();
       setMsgs(m=>[...m,{role:"assistant",text:d.content?.[0]?.text||"Désolé, erreur."}]);
