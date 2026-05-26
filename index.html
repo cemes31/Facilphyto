@@ -49,6 +49,26 @@ function FM({label,required,onVoice,children}){
 
 
 
+
+const VOICE_CORRECTIONS = {
+  "vente": "vent", "vingt": "vent", "van": "vent", "vents": "vent",
+  "prosaro": "Prosaro", "callisto": "Callisto", "karate": "Karaté",
+  "roundup": "Roundup", "comet": "Comet", "amistar": "Amistar",
+  "un": "1", "deux": "2", "trois": "3", "quatre": "4", "cinq": "5",
+  "six": "6", "sept": "7", "huit": "8", "neuf": "9", "dix": "10",
+  "virgule cinq": ".5", "et demi": ".5",
+  "litre": "L/ha", "litres": "L/ha", "kilo": "kg/ha", "kilos": "kg/ha",
+  "fongicide": "Fongicide", "herbicide": "Herbicide", "insecticide": "Insecticide",
+};
+
+function correctVoice(text) {
+  let result = text.toLowerCase();
+  Object.entries(VOICE_CORRECTIONS).forEach(([wrong, right]) => {
+    result = result.replace(new RegExp(wrong, 'gi'), right);
+  });
+  return result.charAt(0).toUpperCase() + result.slice(1);
+}
+
 const EPHY_PRODUCTS = [
   {nom:"Prosaro",amm:"2090141",cible:"Fongicide",dar:35,unite:"L/ha",dose_max:1.0},
   {nom:"Callisto",amm:"2050122",cible:"Herbicide",dar:0,unite:"L/ha",dose_max:1.5},
@@ -298,6 +318,7 @@ function App(){
   const [interventions,setInterventions]=useState([]);
   const [certiphytos,setCertiphytos]=useState([]);
   const [showFP,setShowFP]=useState(false);
+  const [editingI,setEditingI]=useState(null);
   const [showFI,setShowFI]=useState(false);
   const [showFC,setShowFC]=useState(false);
   const [saveMsg,setSaveMsg]=useState("");
@@ -349,7 +370,22 @@ function App(){
     if(!error){await loadData();setFP({nom:"",surface:"",culture:"",ilot:"",commune:""});setShowFP(false);showSave();}
   };
 
+  const updateI=async()=>{
+    if(!editingI||!fI.parcelle_id||!fI.produit)return;
+    const{error}=await supabase.from("interventions").update({...fI,dose:parseFloat(fI.dose)||0,surface_traitee:parseFloat(fI.surface_traitee)||0}).eq("id",editingI);
+    if(!error){await loadData();setFI(emptyI);setShowFI(false);setEditingI(null);setDicteeTexte("");setDicteeRes(null);showSave("✅ Traitement modifié !");}
+  };
+
+  const startEditI=(intervention)=>{
+    setFI({...intervention,dose:String(intervention.dose),surface_traitee:String(intervention.surface_traitee),delai_rentree:String(intervention.delai_rentree||"")});
+    setEditingI(intervention.id);
+    setShowFI(true);
+    setDicteeTexte("");setDicteeRes(null);
+    window.scrollTo({top:0,behavior:"smooth"});
+  };
+
   const addI=async()=>{
+    if(editingI) return updateI();
     if(!fI.parcelle_id||!fI.produit)return;
     const{error}=await supabase.from("interventions").insert({...fI,dose:parseFloat(fI.dose)||0,surface_traitee:parseFloat(fI.surface_traitee)||0,user_id:user.id});
     if(!error){await loadData();setFI(emptyI);setShowFI(false);setDicteeTexte("");setDicteeRes(null);showSave();}
@@ -620,8 +656,8 @@ function App(){
                 <div style={{gridColumn:"1/-1"}}><FM label="Justification *" onVoice={v=>setFI(f=>({...f,justification:v}))}><textarea value={fI.justification} onChange={e=>setFI(f=>({...f,justification:e.target.value}))} rows={2} style={{...IS,flex:1,resize:"vertical"}}/></FM></div>
               </div>
               <div style={{display:"flex",gap:10,marginTop:14}}>
-                <button onClick={addI} style={{background:"#8a4a1a",color:"white",border:"none",borderRadius:8,padding:"9px 22px",cursor:"pointer",fontFamily:"inherit",fontWeight:"bold",fontSize:14}}>✅ Enregistrer</button>
-                <button onClick={()=>{setShowFI(false);setFI(emptyI);}} style={{background:"#e8e0d0",color:"#555",border:"none",borderRadius:8,padding:"9px 16px",cursor:"pointer",fontFamily:"inherit"}}>Annuler</button>
+                <button onClick={addI} style={{background:editingI?"#2d6a2d":"#8a4a1a",color:"white",border:"none",borderRadius:8,padding:"9px 22px",cursor:"pointer",fontFamily:"inherit",fontWeight:"bold",fontSize:14}}>{editingI?"💾 Sauvegarder les modifications":"✅ Enregistrer"}</button>
+                <button onClick={()=>{setShowFI(false);setFI(emptyI);setEditingI(null);setDicteeTexte("");setDicteeRes(null);}} style={{background:"#e8e0d0",color:"#555",border:"none",borderRadius:8,padding:"9px 16px",cursor:"pointer",fontFamily:"inherit"}}>Annuler</button>
               </div>
             </div>}
             <div style={{background:"white",borderRadius:12,overflow:"hidden",boxShadow:"0 2px 8px rgba(0,0,0,.08)"}}>
@@ -641,7 +677,10 @@ function App(){
                         <td style={{padding:"8px 12px"}}>{i.operateur}</td>
                         <td style={{padding:"8px 12px",color:"#666",maxWidth:90,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{i.meteo}</td>
                         <td style={{padding:"8px 12px",color:"#555",maxWidth:110,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{i.justification}</td>
-                        <td style={{padding:"8px 12px"}}><button onClick={()=>delI(i.id)} style={{background:"none",border:"none",cursor:"pointer",color:"#c0392b",fontSize:13}}>🗑</button></td>
+                        <td style={{padding:"8px 12px",display:"flex",gap:6}}>
+                          <button onClick={()=>startEditI(i)} style={{background:"none",border:"1px solid #2d6a2d",borderRadius:6,cursor:"pointer",color:"#2d6a2d",fontSize:11,padding:"2px 6px",fontFamily:"inherit"}}>✏️</button>
+                          <button onClick={()=>delI(i.id)} style={{background:"none",border:"none",cursor:"pointer",color:"#c0392b",fontSize:13}}>🗑</button>
+                        </td>
                       </tr>
                     );})}
                   </tbody>
