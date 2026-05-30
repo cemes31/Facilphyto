@@ -33,7 +33,7 @@ const SOCIETE={nom:"Facil'Gestion31",adresse:"31460 Caraman",siret:"812388411000
 const CIBLES=["Fongicide","Herbicide","Insecticide","Molluscicide","Régulateur","Autre"];
 const UNITES=["L/ha","kg/ha","g/ha","mL/ha"];
 const STADES=["Levée","Tallage","Montaison","Épi 1cm","Gonflement","Épiaison","Floraison","Grain laiteux","Maturité"];
-const CULTURES=["Blé tendre","Blé dur","Orge","Maïs","Colza","Tournesol","Betterave","Pomme de terre","Autre"];
+const CULTURES=["Blé tendre","Blé dur","Orge d'hiver","Orge de printemps","Maïs grain","Maïs fourrage","Colza","Tournesol","Pois chiche","Pois protéagineux","Sorgho","Lin oléagineux","Lin textile","Féverole","Lentille","Lupin","Sarrasin","Triticale","Avoine","Seigle","Pomme de terre","Tomate","Melon","Pastèque","Courgette","Ail","Oignon","Carotte","Prairie temporaire","Prairie permanente","Vigne","Arboriculture","Autre"];
 const CERT_TYPES=["Décideur en exploitation agricole","Opérateur en exploitation agricole","Conseiller","Distributeur"];
 const IS={width:"100%",padding:"9px 12px",border:"2px solid #e0d8c8",borderRadius:8,fontFamily:"inherit",fontSize:14,boxSizing:"border-box"};
 
@@ -351,7 +351,7 @@ function App(){
   },[]);
 
   // Charger données
-  useEffect(()=>{if(user){loadData();}},[ user]);
+  useEffect(()=>{if(user){loadData();loadStocks();}},[user]);
 
   const loadData=async()=>{
     const[{data:p},{data:i},{data:c}]=await Promise.all([
@@ -449,16 +449,30 @@ function App(){
   const annees=[...new Set(interventions.map(i=>i.date?.split("-")[0]).filter(Boolean))].sort((a,b)=>b-a);
   const interByAnnee=interventions.filter(i=>i.date?.startsWith(annee));
 
-  const TABS=[["dashboard","📊","Tableau de bord"],["parcelles","🗺️","Parcelles"],["registre","📋","Registre phyto"],["archives","📅","Archives"],["assolement","🌱","Assolement"],["certiphyto","🎓","Certiphyto"],["conseil","🤖","Conseiller IA"]];
+  const TABS=[["dashboard","📊","Tableau de bord"],["parcelles","🗺️","Parcelles"],["registre","📋","Registre phyto"],["archives","📅","Archives"],["assolement","🌱","Assolement"],["stocks","📦","Stocks phyto"],["certiphyto","🎓","Certiphyto"],["conseil","🤖","Conseiller IA"]];
   
   // Assolement state
   const [assolements,setAssolements]=useState([]);
   const [showFA,setShowFA]=useState(false);
+  const [stocks,setStocks]=useState([]);
+  const [showFS,setShowFS]=useState(false);
+  const emptyS={produit:"",numero_amm:"",quantite_achetee:"",unite:"L",date_achat:"",fournisseur:"",numero_lot:"",date_peremption:"",quantite_restante:""};
+  const [fS,setFS]=useState({produit:"",numero_amm:"",quantite_achetee:"",unite:"L",date_achat:new Date().toISOString().split("T")[0],fournisseur:"",numero_lot:"",date_peremption:"",quantite_restante:""});
   const [anneeAsso,setAnneeAsso]=useState(new Date().getFullYear().toString());
   const emptyA={parcelle_id:"",annee:new Date().getFullYear().toString(),culture:"",surface:""};
   const [fA,setFA]=useState(emptyA);
 
   useEffect(()=>{if(user)loadAssolements();},[user]);
+  const loadStocks=async()=>{
+    const{data}=await supabase.from("stocks_phyto").select("*").eq("user_id",user.id).order("date_achat",{ascending:false});
+    setStocks(data||[]);
+  };
+  const addS=async()=>{
+    if(!fS.produit||!fS.quantite_achetee)return;
+    const{error}=await supabase.from("stocks_phyto").insert({...fS,quantite_achetee:parseFloat(fS.quantite_achetee)||0,quantite_restante:parseFloat(fS.quantite_restante||fS.quantite_achetee)||0,user_id:user.id});
+    if(!error){await loadStocks();setFS({produit:"",numero_amm:"",quantite_achetee:"",unite:"L",date_achat:new Date().toISOString().split("T")[0],fournisseur:"",numero_lot:"",date_peremption:"",quantite_restante:""});setShowFS(false);showSave();}
+  };
+  const delS=async(id)=>{await supabase.from("stocks_phyto").delete().eq("id",id);await loadStocks();};
   const loadAssolements=async()=>{
     const{data}=await supabase.from("assolements").select("*").eq("user_id",user.id).order("annee",{ascending:false});
     setAssolements(data||[]);
@@ -851,6 +865,83 @@ function App(){
                 </table>
               </div>
             </div>}
+          </div>
+        )}
+
+        {/* STOCKS PHYTO */}
+        {tab==="stocks"&&(
+          <div>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16,flexWrap:"wrap",gap:8}}>
+              <h2 style={{color:"#1a3a1a",fontSize:20,margin:0}}>📦 Stocks phytosanitaires</h2>
+              <button onClick={()=>setShowFS(!showFS)} style={{background:"#8a4a1a",color:"white",border:"none",borderRadius:8,padding:"8px 16px",cursor:"pointer",fontFamily:"inherit",fontWeight:"bold",fontSize:13}}>+ Entrée de stock</button>
+            </div>
+            <div style={{background:"#fffbf0",border:"1px solid #d4a843",borderRadius:8,padding:"10px 14px",marginBottom:16,fontSize:12,color:"#8a6a00"}}>
+              📋 Suivi obligatoire des achats et stocks de produits phytosanitaires — Règlement UE 2023/564
+            </div>
+            {showFS&&<div style={{background:"white",borderRadius:12,padding:20,marginBottom:18,border:"2px solid #8a4a1a",boxShadow:"0 4px 16px rgba(0,0,0,.1)"}}>
+              <div style={{fontWeight:"bold",marginBottom:12,color:"#1a3a1a"}}>➕ Nouvelle entrée de stock</div>
+              <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(200px,1fr))",gap:12}}>
+                <FM label="Produit *" onVoice={v=>setFS(f=>({...f,produit:v}))}>
+                  <div style={{flex:1,position:"relative"}}>
+                    <input value={fS.produit} onChange={e=>{const val=e.target.value;setFS(f=>({...f,produit:val}));const found=EPHY_PRODUCTS.find(p=>p.nom.toLowerCase()===val.toLowerCase());if(found)setFS(f=>({...f,produit:found.nom,numero_amm:found.amm}));}} list="ephy-list-stock" style={{...IS,width:"100%"}}/>
+                    <datalist id="ephy-list-stock">{EPHY_PRODUCTS.map(p=><option key={p.amm} value={p.nom}/>)}</datalist>
+                  </div>
+                </FM>
+                <FM label="N° AMM" onVoice={v=>setFS(f=>({...f,numero_amm:v}))}><input value={fS.numero_amm} onChange={e=>setFS(f=>({...f,numero_amm:e.target.value}))} style={{...IS,flex:1}}/></FM>
+                <div style={{display:"flex",gap:8}}>
+                  <FM label="Quantité achetée *" onVoice={v=>setFS(f=>({...f,quantite_achetee:v.replace(",",".")}))}>
+                    <input type="number" value={fS.quantite_achetee} onChange={e=>setFS(f=>({...f,quantite_achetee:e.target.value}))} step="0.1" style={{...IS,flex:1}}/>
+                  </FM>
+                  <div style={{width:80,flexShrink:0}}>
+                    <label style={{display:"block",fontSize:12,fontWeight:"600",marginBottom:4,color:"#555"}}>Unité</label>
+                    <select value={fS.unite} onChange={e=>setFS(f=>({...f,unite:e.target.value}))} style={{...IS,width:"100%"}}>
+                      {["L","kg","g","mL","unité"].map(u=><option key={u}>{u}</option>)}
+                    </select>
+                  </div>
+                </div>
+                <FM label="Quantité restante" onVoice={v=>setFS(f=>({...f,quantite_restante:v.replace(",",".")}))}>
+                  <input type="number" value={fS.quantite_restante} onChange={e=>setFS(f=>({...f,quantite_restante:e.target.value}))} step="0.1" style={{...IS,flex:1}}/>
+                </FM>
+                <div><label style={{display:"block",fontSize:12,fontWeight:"600",marginBottom:4,color:"#555"}}>Date achat *</label><input type="date" value={fS.date_achat} onChange={e=>setFS(f=>({...f,date_achat:e.target.value}))} style={IS}/></div>
+                <div><label style={{display:"block",fontSize:12,fontWeight:"600",marginBottom:4,color:"#555"}}>Date péremption</label><input type="date" value={fS.date_peremption} onChange={e=>setFS(f=>({...f,date_peremption:e.target.value}))} style={IS}/></div>
+                <FM label="Fournisseur" onVoice={v=>setFS(f=>({...f,fournisseur:v}))}><input value={fS.fournisseur} onChange={e=>setFS(f=>({...f,fournisseur:e.target.value}))} placeholder="ex: Coopérative" style={{...IS,flex:1}}/></FM>
+                <FM label="N° de lot" onVoice={v=>setFS(f=>({...f,numero_lot:v}))}><input value={fS.numero_lot} onChange={e=>setFS(f=>({...f,numero_lot:e.target.value}))} style={{...IS,flex:1}}/></FM>
+              </div>
+              <div style={{display:"flex",gap:10,marginTop:12}}>
+                <button onClick={addS} style={{background:"#8a4a1a",color:"white",border:"none",borderRadius:8,padding:"8px 20px",cursor:"pointer",fontFamily:"inherit",fontWeight:"bold"}}>✅ Enregistrer</button>
+                <button onClick={()=>setShowFS(false)} style={{background:"#e8e0d0",color:"#555",border:"none",borderRadius:8,padding:"8px 16px",cursor:"pointer",fontFamily:"inherit"}}>Annuler</button>
+              </div>
+            </div>}
+            {stocks.length===0&&<div style={{background:"white",borderRadius:12,padding:36,textAlign:"center",color:"#aaa"}}>Aucun stock enregistré.</div>}
+            <div style={{background:"white",borderRadius:12,overflow:"hidden",boxShadow:"0 2px 8px rgba(0,0,0,.08)"}}>
+              {stocks.length>0&&<div style={{overflowX:"auto"}}>
+                <table style={{width:"100%",borderCollapse:"collapse",fontSize:13}}>
+                  <thead><tr style={{background:"#1a3a1a",color:"#d4a843"}}>{["Date achat","Produit","N° AMM","Qté achetée","Qté restante","Fournisseur","N° lot","Péremption",""].map(h=><th key={h} style={{padding:"10px 12px",textAlign:"left",whiteSpace:"nowrap"}}>{h}</th>)}</tr></thead>
+                  <tbody>
+                    {stocks.map((s,idx)=>{
+                      const expire=s.date_peremption?Math.ceil((new Date(s.date_peremption)-new Date())/86400000):null;
+                      return <tr key={s.id} style={{background:idx%2===0?"#faf8f4":"white",borderBottom:"1px solid #f0ebe0"}}>
+                        <td style={{padding:"8px 12px"}}>{s.date_achat}</td>
+                        <td style={{padding:"8px 12px",fontWeight:"600",color:"#8a4a1a"}}>{s.produit}</td>
+                        <td style={{padding:"8px 12px",fontFamily:"monospace",fontSize:11}}>{s.numero_amm||"—"}</td>
+                        <td style={{padding:"8px 12px"}}>{s.quantite_achetee} {s.unite}</td>
+                        <td style={{padding:"8px 12px"}}>
+                          <span style={{background:parseFloat(s.quantite_restante)<=0?"#fce4ec":parseFloat(s.quantite_restante)<parseFloat(s.quantite_achetee)*0.2?"#fff3e0":"#e8f5e8",padding:"2px 8px",borderRadius:10,fontSize:12,fontWeight:"600"}}>
+                            {s.quantite_restante} {s.unite}
+                          </span>
+                        </td>
+                        <td style={{padding:"8px 12px"}}>{s.fournisseur||"—"}</td>
+                        <td style={{padding:"8px 12px",fontSize:11}}>{s.numero_lot||"—"}</td>
+                        <td style={{padding:"8px 12px"}}>
+                          {s.date_peremption&&<span style={{color:expire<0?"#c0392b":expire<90?"#e67e22":"#27ae60",fontSize:11,fontWeight:"600"}}>{expire<0?"⚠️ Expiré":expire<90?"⚠️ "+expire+"j":"✅ "+s.date_peremption}</span>}
+                        </td>
+                        <td style={{padding:"8px 12px"}}><button onClick={()=>delS(s.id)} style={{background:"none",border:"none",cursor:"pointer",color:"#c0392b",fontSize:13}}>🗑</button></td>
+                      </tr>;
+                    })}
+                  </tbody>
+                </table>
+              </div>}
+            </div>
           </div>
         )}
 
