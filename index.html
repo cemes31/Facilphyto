@@ -387,8 +387,23 @@ function App(){
   const addI=async()=>{
     if(editingI) return updateI();
     if(!fI.parcelle_id||!fI.produit)return;
-    const{error}=await supabase.from("interventions").insert({...fI,dose:parseFloat(fI.dose)||0,surface_traitee:parseFloat(fI.surface_traitee)||0,user_id:user.id});
-    if(!error){await loadData();setFI(emptyI);setShowFI(false);setDicteeTexte("");setDicteeRes(null);showSave();}
+    const dose=parseFloat(fI.dose)||0;
+    const surface=parseFloat(fI.surface_traitee)||0;
+    const qteUtilisee=dose*surface;
+    const{error}=await supabase.from("interventions").insert({...fI,dose,surface_traitee:surface,user_id:user.id});
+    if(!error){
+      // Mise à jour automatique du stock
+      const stockProduit=stocks.find(s=>s.produit.toLowerCase()===fI.produit.toLowerCase()&&parseFloat(s.quantite_restante)>0);
+      if(stockProduit){
+        const nouvelleQte=Math.max(0,parseFloat(stockProduit.quantite_restante)-qteUtilisee);
+        await supabase.from("stocks_phyto").update({quantite_restante:nouvelleQte}).eq("id",stockProduit.id);
+        await loadStocks();
+        showSave(`✅ Traitement enregistré — Stock ${fI.produit} mis à jour : ${nouvelleQte.toFixed(1)} ${stockProduit.unite} restant(s)`);
+      } else {
+        showSave("✅ Traitement enregistré !");
+      }
+      await loadData();setFI(emptyI);setShowFI(false);setDicteeTexte("");setDicteeRes(null);
+    }
   };
 
   const addC=async()=>{
