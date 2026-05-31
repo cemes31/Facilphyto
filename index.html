@@ -324,7 +324,7 @@ function App(){
   const [saveMsg,setSaveMsg]=useState("");
   const [annee,setAnnee]=useState(new Date().getFullYear().toString());
 
-  const emptyI={parcelle_id:"",date:new Date().toISOString().split("T")[0],produit:"",numero_amm:"",dose:"",unite:"L/ha",cible:"Fongicide",stade:"",surface_traitee:"",operateur:"",materiel:"",meteo:"",delai_rentree:"",justification:""};
+  const emptyI={parcelle_id:"",date:new Date().toISOString().split("T")[0],produit:"",numero_amm:"",dose:"",unite:"L/ha",cible:"Fongicide",stade:"",surface_traitee:"",operateur:"",materiel:"",meteo:"",delai_rentree:"",justification:"",culture_parcelle:""};
   const [fP,setFP]=useState({nom:"",surface:"",culture:"",ilot:"",commune:""});
   const [fI,setFI]=useState(emptyI);
   const [fC,setFC]=useState({titulaire:"",type:CERT_TYPES[0],numero:"",date_obtention:"",date_expiration:"",organisme:"",notes:""});
@@ -387,8 +387,23 @@ function App(){
   const addI=async()=>{
     if(editingI) return updateI();
     if(!fI.parcelle_id||!fI.produit)return;
-    const{error}=await supabase.from("interventions").insert({...fI,dose:parseFloat(fI.dose)||0,surface_traitee:parseFloat(fI.surface_traitee)||0,user_id:user.id});
-    if(!error){await loadData();setFI(emptyI);setShowFI(false);setDicteeTexte("");setDicteeRes(null);showSave();}
+    const dose=parseFloat(fI.dose)||0;
+    const surface=parseFloat(fI.surface_traitee)||0;
+    const qteUtilisee=dose*surface;
+    const{error}=await supabase.from("interventions").insert({...fI,dose,surface_traitee:surface,user_id:user.id});
+    if(!error){
+      // Mise à jour automatique du stock
+      const stockProduit=stocks.find(s=>s.produit.toLowerCase()===fI.produit.toLowerCase()&&parseFloat(s.quantite_restante)>0);
+      if(stockProduit){
+        const nouvelleQte=Math.max(0,parseFloat(stockProduit.quantite_restante)-qteUtilisee);
+        await supabase.from("stocks_phyto").update({quantite_restante:nouvelleQte}).eq("id",stockProduit.id);
+        await loadStocks();
+        showSave(`✅ Traitement enregistré — Stock ${fI.produit} mis à jour : ${nouvelleQte.toFixed(1)} ${stockProduit.unite} restant(s)`);
+      } else {
+        showSave("✅ Traitement enregistré !");
+      }
+      await loadData();setFI(emptyI);setShowFI(false);setDicteeTexte("");setDicteeRes(null);
+    }
   };
 
   const addC=async()=>{
@@ -635,7 +650,18 @@ function App(){
                 </div>}
               </div>
               <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(240px,1fr))",gap:12}}>
-                <div><label style={{display:"block",fontSize:12,fontWeight:"600",marginBottom:4,color:"#555"}}>Parcelle *</label><select value={fI.parcelle_id} onChange={e=>setFI(f=>({...f,parcelle_id:e.target.value}))} style={IS}><option value="">--</option>{parcelles.map(p=><option key={p.id} value={p.id}>{p.nom}</option>)}</select></div>
+                <div>
+                  <label style={{display:"block",fontSize:12,fontWeight:"600",marginBottom:4,color:"#555"}}>Parcelle *</label>
+                  <select value={fI.parcelle_id} onChange={e=>{
+                    const pid=e.target.value;
+                    const p=parcelles.find(p=>p.id===pid);
+                    setFI(f=>({...f,parcelle_id:pid,culture_parcelle:p?.culture||""}));
+                  }} style={IS}>
+                    <option value="">--</option>
+                    {parcelles.map(p=><option key={p.id} value={p.id}>{p.nom}{p.culture?" — "+p.culture:""}</option>)}
+                  </select>
+                  {fI.culture_parcelle&&<div style={{fontSize:11,color:"#27ae60",marginTop:3}}>🌿 Culture détectée : <strong>{fI.culture_parcelle}</strong></div>}
+                </div>
                 <div><label style={{display:"block",fontSize:12,fontWeight:"600",marginBottom:4,color:"#555"}}>Date *</label><input type="date" value={fI.date} onChange={e=>setFI(f=>({...f,date:e.target.value}))} style={IS}/></div>
                 <div>
                   <label style={{display:"block",fontSize:12,fontWeight:"600",marginBottom:4,color:"#555"}}>Produit * <span style={{color:"#27ae60",fontSize:10}}>✅ e-phy intégré</span></label>
