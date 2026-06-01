@@ -390,7 +390,24 @@ function App(){
     const dose=parseFloat(fI.dose)||0;
     const surface=parseFloat(fI.surface_traitee)||0;
     const qteUtilisee=dose*surface;
-    const{error}=await supabase.from("interventions").insert({...fI,dose,surface_traitee:surface,user_id:user.id});
+    const{error}=await supabase.from("interventions").insert({
+        parcelle_id:fI.parcelle_id,
+        date:fI.date,
+        produit:fI.produit,
+        numero_amm:fI.numero_amm||"",
+        dose,
+        unite:fI.unite,
+        cible:fI.cible,
+        stade:fI.stade||"",
+        surface_traitee:surface,
+        operateur:fI.operateur||"",
+        materiel:fI.materiel||"",
+        meteo:fI.meteo||"",
+        delai_rentree:fI.delai_rentree||"",
+        justification:fI.justification||"",
+        culture_parcelle:fI.culture_parcelle||"",
+        user_id:user.id
+      });
     if(!error){
       // Mise à jour automatique du stock
       const stockProduit=stocks.find(s=>s.produit.toLowerCase()===fI.produit.toLowerCase()&&parseFloat(s.quantite_restante)>0);
@@ -412,7 +429,15 @@ function App(){
     if(!error){await loadData();setFC({titulaire:"",type:CERT_TYPES[0],numero:"",date_obtention:"",date_expiration:"",organisme:"",notes:""});setShowFC(false);showSave();}
   };
 
-  const delP=async(id)=>{await supabase.from("parcelles").delete().eq("id",id);await loadData();};
+  const delP=async(id)=>{
+    if(!confirm("Supprimer cette parcelle ?"))return;
+    // Delete related interventions first
+    await supabase.from("interventions").delete().eq("parcelle_id",id);
+    await supabase.from("assolements").delete().eq("parcelle_id",id);
+    const{error}=await supabase.from("parcelles").delete().eq("id",id).eq("user_id",user.id);
+    if(!error){await loadData();showSave("✅ Parcelle supprimée !");}
+    else{alert("Impossible de supprimer : "+error.message);}
+  };
   const delI=async(id)=>{await supabase.from("interventions").delete().eq("id",id);await loadData();};
   const delC=async(id)=>{await supabase.from("certiphytos").delete().eq("id",id);await loadData();};
 
@@ -594,7 +619,7 @@ function App(){
                 {[["nom","Nom *"],["surface","Surface (ha) *"],["ilot","N° îlot PAC"],["commune","Commune"]].map(([k,l])=>(
                   <FM key={k} label={l} onVoice={v=>setFP(f=>({...f,[k]:v}))}><input value={fP[k]||""} onChange={e=>setFP(f=>({...f,[k]:e.target.value}))} style={{...IS,flex:1}}/></FM>
                 ))}
-                <div><label style={{display:"block",fontSize:12,fontWeight:"600",marginBottom:4,color:"#555"}}>Culture</label><select value={fP.culture||""} onChange={e=>setFP(f=>({...f,culture:e.target.value}))} style={IS}><option value="">--</option>{CULTURES.map(c=><option key={c}>{c}</option>)}</select></div>
+
               </div>
               <div style={{display:"flex",gap:10,marginTop:12}}>
                 <button onClick={addP} style={{background:"#2d6a2d",color:"white",border:"none",borderRadius:8,padding:"8px 20px",cursor:"pointer",fontFamily:"inherit",fontWeight:"bold"}}>✅ Enregistrer</button>
@@ -654,13 +679,15 @@ function App(){
                   <label style={{display:"block",fontSize:12,fontWeight:"600",marginBottom:4,color:"#555"}}>Parcelle *</label>
                   <select value={fI.parcelle_id} onChange={e=>{
                     const pid=e.target.value;
-                    const p=parcelles.find(p=>p.id===pid);
-                    setFI(f=>({...f,parcelle_id:pid,culture_parcelle:p?.culture||""}));
+                    // Auto-fill culture from assolement
+                    const anneeEnCours=new Date().getFullYear().toString();
+                    const asso=assolements.find(a=>a.parcelle_id===pid&&a.annee===anneeEnCours);
+                    setFI(f=>({...f,parcelle_id:pid,culture_parcelle:asso?.culture||""}));
                   }} style={IS}>
                     <option value="">--</option>
-                    {parcelles.map(p=><option key={p.id} value={p.id}>{p.nom}{p.culture?" — "+p.culture:""}</option>)}
+                    {parcelles.map(p=><option key={p.id} value={p.id}>{p.nom}</option>)}
                   </select>
-                  {fI.culture_parcelle&&<div style={{fontSize:11,color:"#27ae60",marginTop:3}}>🌿 Culture détectée : <strong>{fI.culture_parcelle}</strong></div>}
+                  {fI.culture_parcelle&&<div style={{fontSize:11,color:"#27ae60",marginTop:3}}>🌿 Culture {new Date().getFullYear()} : <strong>{fI.culture_parcelle}</strong></div>}
                 </div>
                 <div><label style={{display:"block",fontSize:12,fontWeight:"600",marginBottom:4,color:"#555"}}>Date *</label><input type="date" value={fI.date} onChange={e=>setFI(f=>({...f,date:e.target.value}))} style={IS}/></div>
                 <div>
@@ -683,6 +710,13 @@ function App(){
                 </div>
                 <FM label="N° AMM" onVoice={v=>setFI(f=>({...f,numero_amm:v}))}><input value={fI.numero_amm} onChange={e=>setFI(f=>({...f,numero_amm:e.target.value}))} style={{...IS,flex:1}}/></FM>
                 <div><label style={{display:"block",fontSize:12,fontWeight:"600",marginBottom:4,color:"#555"}}>Cible *</label><select value={fI.cible} onChange={e=>setFI(f=>({...f,cible:e.target.value}))} style={IS}>{CIBLES.map(c=><option key={c}>{c}</option>)}</select></div>
+                <div>
+                  <label style={{display:"block",fontSize:12,fontWeight:"600",marginBottom:4,color:"#555"}}>Culture traitée</label>
+                  <select value={fI.culture_parcelle||""} onChange={e=>setFI(f=>({...f,culture_parcelle:e.target.value}))} style={IS}>
+                    <option value="">-- Choisir --</option>
+                    {CULTURES.map(c=><option key={c}>{c}</option>)}
+                  </select>
+                </div>
                 <div><label style={{display:"block",fontSize:12,fontWeight:"600",marginBottom:4,color:"#555"}}>Stade</label><select value={fI.stade} onChange={e=>setFI(f=>({...f,stade:e.target.value}))} style={IS}><option value="">--</option>{STADES.map(s=><option key={s}>{s}</option>)}</select></div>
                 <div style={{display:"flex",gap:6}}>
                   <FM label="Dose *" onVoice={v=>setFI(f=>({...f,dose:v.replace(",",".")}))}><input type="number" value={fI.dose} onChange={e=>setFI(f=>({...f,dose:e.target.value}))} step="0.01" style={{...IS,flex:1}}/></FM>
@@ -703,13 +737,13 @@ function App(){
             <div style={{background:"white",borderRadius:12,overflow:"hidden",boxShadow:"0 2px 8px rgba(0,0,0,.08)"}}>
               <div style={{overflowX:"auto"}}>
                 <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
-                  <thead><tr style={{background:"#1a3a1a",color:"#d4a843"}}>{["Date","Parcelle","Produit","Cible","Dose","Surface","Opérateur","Météo","Motif",""].map(h=><th key={h} style={{padding:"10px 12px",textAlign:"left",whiteSpace:"nowrap"}}>{h}</th>)}</tr></thead>
+                  <thead><tr style={{background:"#1a3a1a",color:"#d4a843"}}>{["Date","Parcelle","Culture","Produit","Cible","Dose","Surface","Opérateur","Météo","Motif",""].map(h=><th key={h} style={{padding:"10px 12px",textAlign:"left",whiteSpace:"nowrap"}}>{h}</th>)}</tr></thead>
                   <tbody>
                     {interventions.length===0&&<tr><td colSpan={10} style={{padding:28,textAlign:"center",color:"#aaa"}}>Aucun traitement enregistré</td></tr>}
                     {interventions.map((i,idx)=>{const p=parcelles.find(p=>p.id===i.parcelle_id);return(
                       <tr key={i.id} style={{background:idx%2===0?"#faf8f4":"white",borderBottom:"1px solid #f0ebe0"}}>
                         <td style={{padding:"8px 12px",whiteSpace:"nowrap"}}>{i.date}</td>
-                        <td style={{padding:"8px 12px",fontWeight:"600"}}>{p?.nom||"—"}</td>
+                        <td style={{padding:"8px 12px",fontWeight:"600"}}>{p?.nom||"—"}</td><td style={{padding:"8px 12px",fontSize:11}}><span style={{background:"#e8f5e8",color:"#2d6a2d",padding:"2px 7px",borderRadius:10}}>{i.culture_parcelle||"—"}</span></td>
                         <td style={{padding:"8px 12px",color:"#8a4a1a",fontWeight:"600"}}>{i.produit}</td>
                         <td style={{padding:"8px 12px"}}><span style={{background:i.cible==="Fongicide"?"#e8f5e8":i.cible==="Herbicide"?"#fff3e0":"#fce4ec",padding:"2px 7px",borderRadius:10,fontSize:11}}>{i.cible}</span></td>
                         <td style={{padding:"8px 12px",whiteSpace:"nowrap"}}>{i.dose} {i.unite}</td>
