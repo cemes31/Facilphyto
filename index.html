@@ -372,8 +372,34 @@ function App(){
 
   const updateI=async()=>{
     if(!editingI||!fI.parcelle_id||!fI.produit)return;
-    const{error}=await supabase.from("interventions").update({...fI,dose:parseFloat(fI.dose)||0,surface_traitee:parseFloat(fI.surface_traitee)||0}).eq("id",editingI);
-    if(!error){await loadData();setFI(emptyI);setShowFI(false);setEditingI(null);setDicteeTexte("");setDicteeRes(null);showSave("✅ Traitement modifié !");}
+    // Get old intervention to calculate stock difference
+    const oldIntervention=interventions.find(i=>i.id===editingI);
+    const oldQte=(parseFloat(oldIntervention?.dose)||0)*(parseFloat(oldIntervention?.surface_traitee)||0);
+    const newDose=parseFloat(fI.dose)||0;
+    const newSurface=parseFloat(fI.surface_traitee)||0;
+    const newQte=newDose*newSurface;
+    const diff=newQte-oldQte; // Positive = more used, negative = less used
+    
+    const{error}=await supabase.from("interventions").update({
+      parcelle_id:fI.parcelle_id,date:fI.date,produit:fI.produit,numero_amm:fI.numero_amm||"",
+      dose:newDose,unite:fI.unite,cible:fI.cible,stade:fI.stade||"",surface_traitee:newSurface,
+      operateur:fI.operateur||"",materiel:fI.materiel||"",meteo:fI.meteo||"",
+      delai_rentree:fI.delai_rentree||"",justification:fI.justification||"",
+      culture_parcelle:fI.culture_parcelle||""
+    }).eq("id",editingI);
+    
+    if(!error){
+      // Update stock if diff != 0
+      if(diff!==0){
+        const stockProduit=stocks.find(s=>s.produit.toLowerCase()===fI.produit.toLowerCase());
+        if(stockProduit){
+          const nouvelleQte=parseFloat(stockProduit.quantite_restante)-diff;
+          await supabase.from("stocks_phyto").update({quantite_restante:nouvelleQte}).eq("id",stockProduit.id);
+          await loadStocks();
+        }
+      }
+      await loadData();setFI(emptyI);setShowFI(false);setEditingI(null);setDicteeTexte("");setDicteeRes(null);showSave("✅ Traitement modifié — stock mis à jour !");
+    }
   };
 
   const startEditI=(intervention)=>{
@@ -412,12 +438,28 @@ function App(){
       // Mise à jour automatique du stock
       const stockProduit=stocks.find(s=>s.produit.toLowerCase()===fI.produit.toLowerCase()&&parseFloat(s.quantite_restante)>0);
       if(stockProduit){
-        const nouvelleQte=Math.max(0,parseFloat(stockProduit.quantite_restante)-qteUtilisee);
+        const nouvelleQte=parseFloat(stockProduit.quantite_restante)-qteUtilisee; // Stock négatif autorisé
         await supabase.from("stocks_phyto").update({quantite_restante:nouvelleQte}).eq("id",stockProduit.id);
         await loadStocks();
         showSave(`✅ Traitement enregistré — Stock ${fI.produit} mis à jour : ${nouvelleQte.toFixed(1)} ${stockProduit.unite} restant(s)`);
       } else {
-        showSave("✅ Traitement enregistré !");
+        showSave("✅ Traitement enregistré ! ⚠️ Aucun stock trouvé pour "+fI.produit+" — pensez à enregistrer votre achat dans Stocks phyto");
+      }
+      // Mise à jour assolement si culture renseignée
+      if(fI.culture_parcelle&&fI.parcelle_id){
+        const anneeTraitement=fI.date?fI.date.split("-")[0]:new Date().getFullYear().toString();
+        const assoExistant=assolements.find(a=>a.parcelle_id===fI.parcelle_id&&a.annee===anneeTraitement);
+        if(!assoExistant){
+          const parcelle=parcelles.find(p=>p.id===fI.parcelle_id);
+          await supabase.from("assolements").insert({
+            parcelle_id:fI.parcelle_id,
+            annee:anneeTraitement,
+            culture:fI.culture_parcelle,
+            surface:parseFloat(fI.surface_traitee)||0,
+            user_id:user.id
+          });
+          await loadAssolements();
+        }
       }
       await loadData();setFI(emptyI);setShowFI(false);setDicteeTexte("");setDicteeRes(null);
     }
@@ -467,7 +509,7 @@ function App(){
       const r=await fetch("/api/chat",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:1000,system:"Tu es conseiller agricole expert en reglementation phytosanitaire française pour FacilPhyto. Reponds en français, pratique et concis.",messages:[...msgs.map(m=>({role:m.role==="assistant"?"assistant":"user",content:m.text})),{role:"user",content:msg}]})});
       if(!r.ok){throw new Error("HTTP "+r.status);}
       const d=await r.json();
-      setMsgs(m=>[...m,{role:"assistant",text:d.content?.[0]?.text||"Désolé, erreur."}]);
+      const aiText=d.content?.[0]?.text||"Désolé, erreur.";setMsgs(m=>[...m,{role:"assistant",text:aiText+"\n\n⚠️ *Vérifiez toujours ces informations sur e-phy.franceagrimer.fr avant toute décision.*"}]);
     }catch(e){setMsgs(m=>[...m,{role:"assistant",text:"⚠️ Le conseiller IA n'est pas disponible pour le moment. Pour toute question réglementaire, contactez votre Chambre d'Agriculture ou consultez e-phy.franceagrimer.fr"}]);}
     setChatLoad(false);
   };
@@ -518,9 +560,19 @@ function App(){
     setAssolements(data||[]);
   };
   const addA=async()=>{
-    if(!fA.parcelle_id||!fA.culture||!fA.surface)return;
-    const{error}=await supabase.from("assolements").insert({...fA,surface:parseFloat(fA.surface),user_id:user.id});
-    if(!error){await loadAssolements();setFA(emptyA);setShowFA(false);showSave();}
+    if(!fA.parcelle_id||!fA.culture||!fA.surface){
+      alert("Veuillez remplir la parcelle, la culture et la surface !");
+      return;
+    }
+    const{error}=await supabase.from("assolements").insert({
+      parcelle_id:fA.parcelle_id,
+      annee:fA.annee,
+      culture:fA.culture,
+      surface:parseFloat(fA.surface),
+      user_id:user.id
+    });
+    if(!error){await loadAssolements();setFA(emptyA);setShowFA(false);showSave("✅ Assolement enregistré !");}
+    else{alert("Erreur : "+error.message);}
   };
   const delA=async(id)=>{await supabase.from("assolements").delete().eq("id",id);await loadAssolements();};
 
@@ -987,7 +1039,7 @@ function App(){
                         <td style={{padding:"8px 12px"}}>{s.quantite_achetee} {s.unite}</td>
                         <td style={{padding:"8px 12px"}}>
                           <span style={{background:parseFloat(s.quantite_restante)<=0?"#fce4ec":parseFloat(s.quantite_restante)<parseFloat(s.quantite_achetee)*0.2?"#fff3e0":"#e8f5e8",padding:"2px 8px",borderRadius:10,fontSize:12,fontWeight:"600"}}>
-                            {s.quantite_restante} {s.unite}
+                            {parseFloat(s.quantite_restante)<0?"⚠️ ":""}{s.quantite_restante} {s.unite}
                           </span>
                         </td>
                         <td style={{padding:"8px 12px"}}>{s.fournisseur||"—"}</td>
