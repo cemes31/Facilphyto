@@ -1065,7 +1065,9 @@ function App(){
                   <tbody>
                     {stocks.map((s,idx)=>{
                       const expire=s.date_peremption?Math.ceil((new Date(s.date_peremption)-new Date())/86400000):null;
-                      return <tr key={s.id} style={{background:idx%2===0?"#faf8f4":"white",borderBottom:"1px solid #f0ebe0"}}>
+                      return <tr key={s.id} 
+                      onClick={()=>{if(parseFloat(s.quantite_restante)<0){setFS({produit:s.produit,numero_amm:s.numero_amm||"",quantite_achetee:"",unite:s.unite||"L",date_achat:new Date().toISOString().split("T")[0],fournisseur:"",numero_lot:"",date_peremption:"",quantite_restante:""});setShowFS(true);window.scrollTo({top:0,behavior:"smooth"});}}}
+                      style={{background:idx%2===0?"#faf8f4":"white",borderBottom:"1px solid #f0ebe0",cursor:parseFloat(s.quantite_restante)<0?"pointer":"default",outline:parseFloat(s.quantite_restante)<0?"2px solid #c0392b":"none"}}>
                         <td style={{padding:"8px 12px"}}>{s.date_achat}</td>
                         <td style={{padding:"8px 12px",fontWeight:"600",color:"#8a4a1a"}}>{s.produit}</td>
                         <td style={{padding:"8px 12px",fontFamily:"monospace",fontSize:11}}>{s.numero_amm||"—"}</td>
@@ -1089,7 +1091,7 @@ function App(){
                           })()}
                           </span>
                         </td>
-                        <td style={{padding:"8px 12px"}}>{s.fournisseur||"—"}</td>
+                        <td style={{padding:"8px 12px",color:s.fournisseur==="⚠️ À régulariser"?"#c0392b":"inherit",fontWeight:s.fournisseur==="⚠️ À régulariser"?"bold":"normal"}}>{s.fournisseur||"—"}{parseFloat(s.quantite_restante)<0&&<div style={{fontSize:10,color:"#c0392b"}}>👆 Cliquez pour régulariser</div>}</td>
                         <td style={{padding:"8px 12px",fontSize:11}}>{s.numero_lot||"—"}</td>
                         <td style={{padding:"8px 12px"}}>
                           {s.date_peremption&&<span style={{color:expire<0?"#c0392b":expire<90?"#e67e22":"#27ae60",fontSize:11,fontWeight:"600"}}>{expire<0?"⚠️ Expiré":expire<90?"⚠️ "+expire+"j":"✅ "+s.date_peremption}</span>}
