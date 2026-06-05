@@ -633,7 +633,7 @@ function App(){
     setShowFS(false);
   };
 
-  const delS=const delS=async(id)=>{await supabase.from("stocks_phyto").delete().eq("id",id);await loadStocks();};
+  const delS=async(id)=>{await supabase.from("stocks_phyto").delete().eq("id",id);await loadStocks();};
   const loadAssolements=async()=>{
     const{data}=await supabase.from("assolements").select("*").eq("user_id",user.id).order("annee",{ascending:false});
     setAssolements(data||[]);
