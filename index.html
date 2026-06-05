@@ -1119,13 +1119,7 @@ function App(){
                         <td style={{padding:"8px 12px",fontFamily:"monospace",fontSize:11}}>{s.numero_amm||"—"}</td>
                         <td style={{padding:"8px 12px"}}>{s.quantite_achetee} {s.unite}</td>
                         <td style={{padding:"8px 12px"}}>
-                          {(()=>{
-                            const qteUtilisee=interventions
-                              .filter(i=>i.produit.toLowerCase()===s.produit.toLowerCase())
-                              .reduce((accum,i)=>(sum+(parseFloat(i.dose)||0)*(parseFloat(i.surface_traitee)||0)),0);
-                            return <span style={{color:"#8a4a1a",fontWeight:"600"}}>{qteUtilisee.toFixed(1)} {s.unite}</span>;
-                          })()
-                        }
+                          {interventions.filter(i=>i.produit.toLowerCase()===s.produit.toLowerCase()).reduce((acc,i)=>acc+(parseFloat(i.dose)||0)*(parseFloat(i.surface_traitee)||0),0).toFixed(1)+" "+(s.unite||"")}
                         </td>
                         <td style={{padding:"8px 12px"}}>
                           <span style={{background:parseFloat(s.quantite_restante)<=0?"#fce4ec":parseFloat(s.quantite_restante)<parseFloat(s.quantite_achetee)*0.2?"#fff3e0":"#e8f5e8",padding:"2px 8px",borderRadius:10,fontSize:12,fontWeight:"600"}}>
@@ -1198,59 +1192,56 @@ function App(){
             </div>
 
             {/* Tableau récapitulatif */}
-            {(()=>{
-              const interAnnee2=interventions.filter(i=>i.date?.startsWith(annee));
-              if(interAnnee2.length===0)return <div style={{background:"white",borderRadius:12,padding:36,textAlign:"center",color:"#aaa"}}>Aucun traitement enregistré pour {annee}</div>;
-              
-              const produits={};
-              interAnnee2.forEach(i=>{
-                const key=i.produit+"_"+(i.numero_amm||"");
-                if(!produits[key])produits[key]={produit:i.produit,numero_amm:i.numero_amm||"—",qte_totale:0,surface_totale:0,unite:i.unite,nb_traitements:0,cible:i.cible};
-                produits[key].qte_totale+=(parseFloat(i.dose)||0)*(parseFloat(i.surface_traitee)||0);
-                produits[key].surface_totale+=parseFloat(i.surface_traitee)||0;
-                produits[key].nb_traitements++;
+            {interventions.filter(i=>i.date?.startsWith(annee)).length===0?(
+              <div style={{background:"white",borderRadius:12,padding:36,textAlign:"center",color:"#aaa"}}>Aucun traitement enregistré pour {annee}</div>
+            ):(()=>{
+              const dphyData={};
+              interventions.filter(i=>i.date?.startsWith(annee)).forEach(i=>{
+                const k=i.produit+"_"+(i.numero_amm||"");
+                if(!dphyData[k])dphyData[k]={produit:i.produit,amm:i.numero_amm||"—",qte:0,surf:0,nb:0,cible:i.cible,unite:i.unite};
+                dphyData[k].qte+=(parseFloat(i.dose)||0)*(parseFloat(i.surface_traitee)||0);
+                dphyData[k].surf+=parseFloat(i.surface_traitee)||0;
+                dphyData[k].nb++;
               });
-              const rows2=Object.values(produits);
-              
+              const dphyRows=Object.values(dphyData);
               return(
                 <div>
                   <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(150px,1fr))",gap:12,marginBottom:16}}>
                     {[
-                      {l:"Traitements",v:interAnnee2.length,i:"🧴",c:"#8a4a1a"},
-                      {l:"Produits différents",v:rows.length,i:"🌿",c:"#2d6a2d"},
-                      {l:"Surface totale",v:Math.max(...rows2.map(r=>r.surface_totale)).toFixed(1)+" ha",i:"🗺️",c:"#1a5a8a"},
-                    ].map(c=>(
-                      <div key={c.l} style={{background:"white",borderRadius:10,padding:"14px 16px",borderLeft:`4px solid ${c.c}`,boxShadow:"0 2px 8px rgba(0,0,0,.08)"}}>
-                        <div style={{fontSize:20,marginBottom:4}}>{c.i}</div>
-                        <div style={{fontSize:18,fontWeight:"bold",color:c.c}}>{c.v}</div>
-                        <div style={{fontSize:11,color:"#666"}}>{c.l}</div>
+                      {l:"Traitements",v:interventions.filter(i=>i.date?.startsWith(annee)).length,i:"🧴",c:"#8a4a1a"},
+                      {l:"Produits différents",v:dphyRows.length,i:"🌿",c:"#2d6a2d"},
+                      {l:"Surface max",v:dphyRows.length>0?Math.max(...dphyRows.map(r=>r.surf)).toFixed(1)+" ha":"0 ha",i:"🗺️",c:"#1a5a8a"},
+                    ].map(card=>(
+                      <div key={card.l} style={{background:"white",borderRadius:10,padding:"14px 16px",borderLeft:"4px solid "+card.c,boxShadow:"0 2px 8px rgba(0,0,0,.08)"}}>
+                        <div style={{fontSize:20,marginBottom:4}}>{card.i}</div>
+                        <div style={{fontSize:18,fontWeight:"bold",color:card.c}}>{card.v}</div>
+                        <div style={{fontSize:11,color:"#666"}}>{card.l}</div>
                       </div>
                     ))}
                   </div>
-                  
                   <div style={{background:"white",borderRadius:12,overflow:"hidden",boxShadow:"0 2px 8px rgba(0,0,0,.08)"}}>
                     <div style={{padding:"12px 16px",background:"#1a3a1a",color:"#d4a843",fontWeight:"bold",fontSize:14}}>
                       Récapitulatif produits — Campagne {annee}
                     </div>
                     <div style={{overflowX:"auto"}}>
                       <table style={{width:"100%",borderCollapse:"collapse",fontSize:13}}>
-                        <thead><tr style={{background:"#f5f0e8"}}>{["Produit","N° AMM","Type","Qté totale utilisée","Surface totale","Nb traitements"].map(h=><th key={h} style={{padding:"10px 14px",textAlign:"left",color:"#555",fontWeight:"600",whiteSpace:"nowrap"}}>{h}</th>)}</tr></thead>
+                        <thead><tr style={{background:"#f5f0e8"}}>{["Produit","N° AMM","Type","Qté totale","Surface","Nb traitements"].map(h=><th key={h} style={{padding:"10px 14px",textAlign:"left",color:"#555",fontWeight:"600",whiteSpace:"nowrap"}}>{h}</th>)}</tr></thead>
                         <tbody>
-                          {rows2.map((r,idx)=>(
-                            <tr key={r.produit} style={{background:idx%2===0?"#faf8f4":"white",borderBottom:"1px solid #f0ebe0"}}>
+                          {dphyRows.map((r,idx)=>(
+                            <tr key={r.produit+idx} style={{background:idx%2===0?"#faf8f4":"white",borderBottom:"1px solid #f0ebe0"}}>
                               <td style={{padding:"10px 14px",fontWeight:"600",color:"#8a4a1a"}}>{r.produit}</td>
-                              <td style={{padding:"10px 14px",fontFamily:"monospace",fontSize:11}}>{r.numero_amm}</td>
+                              <td style={{padding:"10px 14px",fontFamily:"monospace",fontSize:11}}>{r.amm}</td>
                               <td style={{padding:"10px 14px"}}><span style={{background:r.cible==="Fongicide"?"#e8f5e8":r.cible==="Herbicide"?"#fff3e0":"#fce4ec",padding:"2px 8px",borderRadius:10,fontSize:11}}>{r.cible}</span></td>
-                              <td style={{padding:"10px 14px",fontWeight:"bold",color:"#1a3a1a"}}>{r.qte_totale.toFixed(2)} {r.unite.replace("/ha","")}</td>
-                              <td style={{padding:"10px 14px"}}>{r.surface_totale.toFixed(1)} ha</td>
-                              <td style={{padding:"10px 14px",textAlign:"center"}}><span style={{background:"#e8f5e8",color:"#2d6a2d",borderRadius:20,padding:"2px 10px",fontWeight:"bold"}}>{r.nb_traitements}</span></td>
+                              <td style={{padding:"10px 14px",fontWeight:"bold"}}>{r.qte.toFixed(2)} {r.unite.replace("/ha","")}</td>
+                              <td style={{padding:"10px 14px"}}>{r.surf.toFixed(1)} ha</td>
+                              <td style={{padding:"10px 14px",textAlign:"center"}}><span style={{background:"#e8f5e8",color:"#2d6a2d",borderRadius:20,padding:"2px 10px",fontWeight:"bold"}}>{r.nb}</span></td>
                             </tr>
                           ))}
                         </tbody>
                       </table>
                     </div>
                     <div style={{padding:"10px 14px",background:"#f5f0e8",fontSize:11,color:"#888"}}>
-                      ⚠️ Ces données sont à déclarer sur <strong>telepac.agriculture.gouv.fr</strong> avant le 31/05/{annee+1} · Déclaration DPHY obligatoire
+                      ⚠️ À déclarer sur telepac.agriculture.gouv.fr avant le 31/05/{parseInt(annee)+1} · DPHY obligatoire
                     </div>
                   </div>
                 </div>
