@@ -571,6 +571,7 @@ function App(){
   const [showFA,setShowFA]=useState(false);
   const [stocks,setStocks]=useState([]);
   const [showFS,setShowFS]=useState(false);
+  const [editingStockId,setEditingStockId]=useState(null);
   const emptyS={produit:"",numero_amm:"",quantite_achetee:"",unite:"L",date_achat:"",fournisseur:"",numero_lot:"",date_peremption:"",quantite_restante:""};
   const [fS,setFS]=useState({produit:"",numero_amm:"",quantite_achetee:"",unite:"L",date_achat:new Date().toISOString().split("T")[0],fournisseur:"",numero_lot:"",date_peremption:"",quantite_restante:""});
   const [anneeAsso,setAnneeAsso]=useState(new Date().getFullYear().toString());
@@ -583,11 +584,56 @@ function App(){
     setStocks(data||[]);
   };
   const addS=async()=>{
-    if(!fS.produit||!fS.quantite_achetee)return;
-    const{error}=await supabase.from("stocks_phyto").insert({...fS,quantite_achetee:parseFloat(fS.quantite_achetee)||0,quantite_restante:parseFloat(fS.quantite_restante||fS.quantite_achetee)||0,user_id:user.id});
-    if(!error){await loadStocks();setFS({produit:"",numero_amm:"",quantite_achetee:"",unite:"L",date_achat:new Date().toISOString().split("T")[0],fournisseur:"",numero_lot:"",date_peremption:"",quantite_restante:""});setShowFS(false);showSave();}
+    if(!fS.produit||!fS.quantite_achetee){
+      alert("Veuillez remplir le produit et la quantité achetée !");
+      return;
+    }
+    const qteAchetee=parseFloat(fS.quantite_achetee)||0;
+    
+    if(editingStockId){
+      // Régularisation — on met à jour la ligne négative existante
+      const stockExistant=stocks.find(s=>s.id===editingStockId);
+      const qteUtilisee=Math.abs(parseFloat(stockExistant?.quantite_restante)||0);
+      const qteRestante=qteAchetee-qteUtilisee;
+      
+      await supabase.from("stocks_phyto").update({
+        quantite_achetee:qteAchetee,
+        quantite_restante:qteRestante,
+        date_achat:fS.date_achat,
+        fournisseur:fS.fournisseur||"",
+        numero_lot:fS.numero_lot||"",
+        date_peremption:fS.date_peremption||"",
+        numero_amm:fS.numero_amm||""
+      }).eq("id",editingStockId);
+      
+      setEditingStockId(null);
+      showSave("✅ Stock "+fS.produit+" régularisé ! Restant : "+qteRestante.toFixed(1)+" "+fS.unite);
+    } else {
+      // Nouvelle entrée
+      const qteDejaUtilisee=interventions
+        .filter(i=>i.produit.toLowerCase()===fS.produit.toLowerCase())
+        .reduce((sum,i)=>(sum+(parseFloat(i.dose)||0)*(parseFloat(i.surface_traitee)||0)),0);
+      const qteRestante=fS.quantite_restante?parseFloat(fS.quantite_restante):qteAchetee-qteDejaUtilisee;
+      
+      const{error}=await supabase.from("stocks_phyto").insert({
+        produit:fS.produit,numero_amm:fS.numero_amm||"",
+        quantite_achetee:qteAchetee,unite:fS.unite,
+        quantite_restante:qteRestante,
+        date_achat:fS.date_achat,date_peremption:fS.date_peremption||"",
+        fournisseur:fS.fournisseur||"",numero_lot:fS.numero_lot||"",
+        user_id:user.id
+      });
+      if(error){alert("Erreur : "+error.message);return;}
+      if(qteDejaUtilisee>0)showSave("✅ Stock enregistré ! Restant : "+qteRestante.toFixed(1)+" "+fS.unite);
+      else showSave("✅ Stock enregistré !");
+    }
+    
+    await loadStocks();
+    setFS({produit:"",numero_amm:"",quantite_achetee:"",unite:"L",date_achat:new Date().toISOString().split("T")[0],fournisseur:"",numero_lot:"",date_peremption:"",quantite_restante:""});
+    setShowFS(false);
   };
-  const delS=async(id)=>{await supabase.from("stocks_phyto").delete().eq("id",id);await loadStocks();};
+
+  const delS=const delS=async(id)=>{await supabase.from("stocks_phyto").delete().eq("id",id);await loadStocks();};
   const loadAssolements=async()=>{
     const{data}=await supabase.from("assolements").select("*").eq("user_id",user.id).order("annee",{ascending:false});
     setAssolements(data||[]);
@@ -1024,7 +1070,7 @@ function App(){
               📋 Suivi obligatoire des achats et stocks de produits phytosanitaires — Règlement UE 2023/564
             </div>
             {showFS&&<div style={{background:"white",borderRadius:12,padding:20,marginBottom:18,border:"2px solid #8a4a1a",boxShadow:"0 4px 16px rgba(0,0,0,.1)"}}>
-              <div style={{fontWeight:"bold",marginBottom:12,color:"#1a3a1a"}}>➕ Nouvelle entrée de stock</div>
+              <div style={{fontWeight:"bold",marginBottom:12,color:editingStockId?"#c0392b":"#1a3a1a"}}>{editingStockId?"🔧 Régulariser le stock — saisissez la quantité achetée":"➕ Nouvelle entrée de stock"}</div>
               <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(200px,1fr))",gap:12}}>
                 <FM label="Produit *" onVoice={v=>setFS(f=>({...f,produit:v}))}>
                   <div style={{flex:1,position:"relative"}}>
@@ -1054,7 +1100,7 @@ function App(){
               </div>
               <div style={{display:"flex",gap:10,marginTop:12}}>
                 <button onClick={addS} style={{background:"#8a4a1a",color:"white",border:"none",borderRadius:8,padding:"8px 20px",cursor:"pointer",fontFamily:"inherit",fontWeight:"bold"}}>✅ Enregistrer</button>
-                <button onClick={()=>setShowFS(false)} style={{background:"#e8e0d0",color:"#555",border:"none",borderRadius:8,padding:"8px 16px",cursor:"pointer",fontFamily:"inherit"}}>Annuler</button>
+                <button onClick={()=>{setShowFS(false);setEditingStockId(null);}} style={{background:"#e8e0d0",color:"#555",border:"none",borderRadius:8,padding:"8px 16px",cursor:"pointer",fontFamily:"inherit"}}>Annuler</button>
               </div>
             </div>}
             {stocks.length===0&&<div style={{background:"white",borderRadius:12,padding:36,textAlign:"center",color:"#aaa"}}>Aucun stock enregistré.</div>}
@@ -1066,7 +1112,7 @@ function App(){
                     {stocks.map((s,idx)=>{
                       const expire=s.date_peremption?Math.ceil((new Date(s.date_peremption)-new Date())/86400000):null;
                       return <tr key={s.id} 
-                      onClick={()=>{if(parseFloat(s.quantite_restante)<0){setFS({produit:s.produit,numero_amm:s.numero_amm||"",quantite_achetee:"",unite:s.unite||"L",date_achat:new Date().toISOString().split("T")[0],fournisseur:"",numero_lot:"",date_peremption:"",quantite_restante:""});setShowFS(true);window.scrollTo({top:0,behavior:"smooth"});}}}
+                      onClick={()=>{if(parseFloat(s.quantite_restante)<0){setFS({produit:s.produit,numero_amm:s.numero_amm||"",quantite_achetee:"",unite:s.unite||"L",date_achat:new Date().toISOString().split("T")[0],fournisseur:"",numero_lot:"",date_peremption:"",quantite_restante:""});setEditingStockId(s.id);setShowFS(true);window.scrollTo({top:0,behavior:"smooth"});}}}
                       style={{background:idx%2===0?"#faf8f4":"white",borderBottom:"1px solid #f0ebe0",cursor:parseFloat(s.quantite_restante)<0?"pointer":"default",outline:parseFloat(s.quantite_restante)<0?"2px solid #c0392b":"none"}}>
                         <td style={{padding:"8px 12px"}}>{s.date_achat}</td>
                         <td style={{padding:"8px 12px",fontWeight:"600",color:"#8a4a1a"}}>{s.produit}</td>
