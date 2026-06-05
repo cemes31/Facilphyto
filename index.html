@@ -1122,9 +1122,10 @@ function App(){
                           {(()=>{
                             const qteUtilisee=interventions
                               .filter(i=>i.produit.toLowerCase()===s.produit.toLowerCase())
-                              .reduce((sum,i)=>(sum+(parseFloat(i.dose)||0)*(parseFloat(i.surface_traitee)||0)),0);
+                              .reduce((accum,i)=>(sum+(parseFloat(i.dose)||0)*(parseFloat(i.surface_traitee)||0)),0);
                             return <span style={{color:"#8a4a1a",fontWeight:"600"}}>{qteUtilisee.toFixed(1)} {s.unite}</span>;
-                          })()}
+                          })()
+                        }
                         </td>
                         <td style={{padding:"8px 12px"}}>
                           <span style={{background:parseFloat(s.quantite_restante)<=0?"#fce4ec":parseFloat(s.quantite_restante)<parseFloat(s.quantite_achetee)*0.2?"#fff3e0":"#e8f5e8",padding:"2px 8px",borderRadius:10,fontSize:12,fontWeight:"600"}}>
