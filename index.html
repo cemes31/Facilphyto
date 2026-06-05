@@ -1169,14 +1169,14 @@ function App(){
               <button onClick={()=>{
                 const interAnnee=interventions.filter(i=>i.date?.startsWith(annee));
                 const produits={};
-                interAnnee2.forEach(i=>{
+                interAnnee.forEach(i=>{
                   const key=i.produit+"_"+i.numero_amm;
                   if(!produits[key])produits[key]={produit:i.produit,numero_amm:i.numero_amm||"",qte_totale:0,surface_totale:0,unite:i.unite,nb_traitements:0};
                   produits[key].qte_totale+=(parseFloat(i.dose)||0)*(parseFloat(i.surface_traitee)||0);
                   produits[key].surface_totale+=parseFloat(i.surface_traitee)||0;
                   produits[key].nb_traitements++;
                 });
-                const rows2=Object.values(produits);
+                const rows=Object.values(produits);
                 let csv="BILAN DPHY "+annee+" - "+SOCIETE.nom+"\n";
                 csv+="Produit,N AMM,Quantite totale utilisee,Unite,Surface totale traitee (ha),Nb traitements\n";
                 rows.forEach(r=>{csv+=r.produit+","+r.numero_amm+","+r.qte_totale.toFixed(2)+","+r.unite.replace("/ha","")+","+r.surface_totale.toFixed(2)+","+r.nb_traitements+"\n";});
