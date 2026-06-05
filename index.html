@@ -1129,13 +1129,10 @@ function App(){
                         </td>
                         <td style={{padding:"8px 12px"}}>
                           <span style={{background:parseFloat(s.quantite_restante)<=0?"#fce4ec":parseFloat(s.quantite_restante)<parseFloat(s.quantite_achetee)*0.2?"#fff3e0":"#e8f5e8",padding:"2px 8px",borderRadius:10,fontSize:12,fontWeight:"600"}}>
-                            {(()=>{
-                            const qte=parseFloat(s.quantite_restante);
-                            return <span style={{color:qte<0?"#c0392b":qte<parseFloat(s.quantite_achetee)*0.2?"#e67e22":"#27ae60",fontWeight:"bold"}}>
-                              {qte<0?"⚠️ ":qte<parseFloat(s.quantite_achetee)*0.2&&qte>0?"⚠️ ":"✅ "}{s.quantite_restante} {s.unite}
-                              {qte<0&&<div style={{fontSize:10,color:"#c0392b"}}>À régulariser !</div>}
-                            </span>;
-                          })()}
+                            <span style={{color:parseFloat(s.quantite_restante)<0?"#c0392b":parseFloat(s.quantite_restante)<parseFloat(s.quantite_achetee)*0.2?"#e67e22":"#27ae60",fontWeight:"bold"}}>
+                            {parseFloat(s.quantite_restante)<0?"⚠️ ":"✅ "}{s.quantite_restante} {s.unite}
+                            {parseFloat(s.quantite_restante)<0&&<div style={{fontSize:10,color:"#c0392b"}}>À régulariser !</div>}
+                          </span>
                           </span>
                         </td>
                         <td style={{padding:"8px 12px",color:s.fournisseur==="⚠️ À régulariser"?"#c0392b":"inherit",fontWeight:s.fournisseur==="⚠️ À régulariser"?"bold":"normal"}}>{s.fournisseur||"—"}{parseFloat(s.quantite_restante)<0&&<div style={{fontSize:10,color:"#c0392b"}}>👆 Cliquez pour régulariser</div>}</td>
@@ -1178,14 +1175,14 @@ function App(){
               <button onClick={()=>{
                 const interAnnee=interventions.filter(i=>i.date?.startsWith(annee));
                 const produits={};
-                interAnnee.forEach(i=>{
+                interAnnee2.forEach(i=>{
                   const key=i.produit+"_"+i.numero_amm;
                   if(!produits[key])produits[key]={produit:i.produit,numero_amm:i.numero_amm||"",qte_totale:0,surface_totale:0,unite:i.unite,nb_traitements:0};
                   produits[key].qte_totale+=(parseFloat(i.dose)||0)*(parseFloat(i.surface_traitee)||0);
                   produits[key].surface_totale+=parseFloat(i.surface_traitee)||0;
                   produits[key].nb_traitements++;
                 });
-                const rows=Object.values(produits);
+                const rows2=Object.values(produits);
                 let csv="BILAN DPHY "+annee+" - "+SOCIETE.nom+"\n";
                 csv+="Produit,N AMM,Quantite totale utilisee,Unite,Surface totale traitee (ha),Nb traitements\n";
                 rows.forEach(r=>{csv+=r.produit+","+r.numero_amm+","+r.qte_totale.toFixed(2)+","+r.unite.replace("/ha","")+","+r.surface_totale.toFixed(2)+","+r.nb_traitements+"\n";});
@@ -1202,26 +1199,26 @@ function App(){
 
             {/* Tableau récapitulatif */}
             {(()=>{
-              const interAnnee=interventions.filter(i=>i.date?.startsWith(annee));
-              if(interAnnee.length===0)return <div style={{background:"white",borderRadius:12,padding:36,textAlign:"center",color:"#aaa"}}>Aucun traitement enregistré pour {annee}</div>;
+              const interAnnee2=interventions.filter(i=>i.date?.startsWith(annee));
+              if(interAnnee2.length===0)return <div style={{background:"white",borderRadius:12,padding:36,textAlign:"center",color:"#aaa"}}>Aucun traitement enregistré pour {annee}</div>;
               
               const produits={};
-              interAnnee.forEach(i=>{
+              interAnnee2.forEach(i=>{
                 const key=i.produit+"_"+(i.numero_amm||"");
                 if(!produits[key])produits[key]={produit:i.produit,numero_amm:i.numero_amm||"—",qte_totale:0,surface_totale:0,unite:i.unite,nb_traitements:0,cible:i.cible};
                 produits[key].qte_totale+=(parseFloat(i.dose)||0)*(parseFloat(i.surface_traitee)||0);
                 produits[key].surface_totale+=parseFloat(i.surface_traitee)||0;
                 produits[key].nb_traitements++;
               });
-              const rows=Object.values(produits);
+              const rows2=Object.values(produits);
               
               return(
                 <div>
                   <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(150px,1fr))",gap:12,marginBottom:16}}>
                     {[
-                      {l:"Traitements",v:interAnnee.length,i:"🧴",c:"#8a4a1a"},
+                      {l:"Traitements",v:interAnnee2.length,i:"🧴",c:"#8a4a1a"},
                       {l:"Produits différents",v:rows.length,i:"🌿",c:"#2d6a2d"},
-                      {l:"Surface totale",v:Math.max(...rows.map(r=>r.surface_totale)).toFixed(1)+" ha",i:"🗺️",c:"#1a5a8a"},
+                      {l:"Surface totale",v:Math.max(...rows2.map(r=>r.surface_totale)).toFixed(1)+" ha",i:"🗺️",c:"#1a5a8a"},
                     ].map(c=>(
                       <div key={c.l} style={{background:"white",borderRadius:10,padding:"14px 16px",borderLeft:`4px solid ${c.c}`,boxShadow:"0 2px 8px rgba(0,0,0,.08)"}}>
                         <div style={{fontSize:20,marginBottom:4}}>{c.i}</div>
@@ -1239,7 +1236,7 @@ function App(){
                       <table style={{width:"100%",borderCollapse:"collapse",fontSize:13}}>
                         <thead><tr style={{background:"#f5f0e8"}}>{["Produit","N° AMM","Type","Qté totale utilisée","Surface totale","Nb traitements"].map(h=><th key={h} style={{padding:"10px 14px",textAlign:"left",color:"#555",fontWeight:"600",whiteSpace:"nowrap"}}>{h}</th>)}</tr></thead>
                         <tbody>
-                          {rows.map((r,idx)=>(
+                          {rows2.map((r,idx)=>(
                             <tr key={r.produit} style={{background:idx%2===0?"#faf8f4":"white",borderBottom:"1px solid #f0ebe0"}}>
                               <td style={{padding:"10px 14px",fontWeight:"600",color:"#8a4a1a"}}>{r.produit}</td>
                               <td style={{padding:"10px 14px",fontFamily:"monospace",fontSize:11}}>{r.numero_amm}</td>
