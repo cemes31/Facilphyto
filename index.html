@@ -264,7 +264,7 @@ function exportAllData(parcelles,interventions,certiphytos,assolements){
 function printRegistre(interventions,parcelles){
   const rows=interventions.map(i=>{const p=parcelles.find(p=>p.id===i.parcelle_id);return`<tr><td>${i.date}</td><td>${p?.nom||"—"}</td><td>${i.produit}</td><td>${i.numero_amm||"—"}</td><td>${i.cible}</td><td>${i.dose} ${i.unite}</td><td>${i.surface_traitee} ha</td><td>${i.operateur||"—"}</td><td>${i.meteo||"—"}</td><td>${i.justification||"—"}</td></tr>`;}).join("");
   const w=window.open("","_blank");
-  w.document.write(`<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8"><title>FacilPhyto — Registre</title><style>body{font-family:Arial,sans-serif;font-size:11px;margin:20px}h1{font-size:16px;color:#1a3a1a;margin-bottom:4px}.sub{font-size:10px;color:#666;margin-bottom:14px}table{width:100%;border-collapse:collapse;font-size:9px}th{background:#1a3a1a;color:#d4a843;padding:6px 7px;text-align:left}td{padding:5px 7px;border-bottom:1px solid #eee}tr:nth-child(even){background:#f9f7f3}.footer{margin-top:12px;font-size:9px;color:#999;border-top:1px solid #ddd;padding-top:6px}@media print{button{display:none}}</style></head><body><h1>🌾 FacilPhyto — Registre des traitements</h1><div class="sub">${SOCIETE.nom} · ${SOCIETE.adresse} · SIRET : ${SOCIETE.siret} · Édité le ${new Date().toLocaleDateString("fr-FR")}</div><table><thead><tr><th>Date</th><th>Parcelle</th><th>Produit</th><th>N° AMM</th><th>Cible</th><th>Dose</th><th>Surface</th><th>Opérateur</th><th>Météo</th><th>Justification</th></tr></thead><tbody>${rows}</tbody></table><div class="footer">Conforme arrêté 16/10/2001 & Règlement UE 2023/564 · Conservation 5 ans · ${interventions.length} enregistrement(s)</div><br><button onclick="window.print()">🖨️ Imprimer / PDF</button></body></html>`);
+  w.document.write(`<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8"><title>FacilPhyto — Registre</title><style>body{font-family:Arial,sans-serif;font-size:11px;margin:20px}h1{font-size:16px;color:#1a3a1a;margin-bottom:4px}.sub{font-size:10px;color:#666;margin-bottom:14px}table{width:100%;border-collapse:collapse;font-size:9px}th{background:#1a3a1a;color:#d4a843;padding:6px 7px;text-align:left}td{padding:5px 7px;border-bottom:1px solid #eee}tr:nth-child(even){background:#f9f7f3}.footer{margin-top:12px;font-size:9px;color:#999;border-top:1px solid #ddd;padding-top:6px}@media print{button{display:none}}</style></head><body><h1>🌾 FacilPhyto — Registre des traitements</h1><div class="sub">${SOCIETE.nom} - ${SOCIETE.adresse} - SIRET : ${SOCIETE.siret} - Édité le ${new Date().toLocaleDateString("fr-FR")}</div><table><thead><tr><th>Date</th><th>Parcelle</th><th>Produit</th><th>N° AMM</th><th>Cible</th><th>Dose</th><th>Surface</th><th>Opérateur</th><th>Météo</th><th>Justification</th></tr></thead><tbody>${rows}</tbody></table><div class="footer">Conforme arrêté 16/10/2001 & Règlement UE 2023/564 - Conservation 5 ans - ${interventions.length} enregistrement(s)</div><br><button onclick="window.print()">🖨️ Imprimer / PDF</button></body></html>`);
   w.document.close();setTimeout(()=>w.print(),400);
 }
 
@@ -763,7 +763,7 @@ function App(){
                 <div key={p.id} style={{background:"white",borderRadius:12,padding:"16px 20px",boxShadow:"0 2px 8px rgba(0,0,0,.08)",display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:8}}>
                   <div style={{display:"flex",alignItems:"center",gap:12}}>
                     <div style={{background:"#e8f5e8",borderRadius:10,width:42,height:42,display:"flex",alignItems:"center",justifyContent:"center",fontSize:18}}>🌿</div>
-                    <div><div style={{fontWeight:"bold",fontSize:14}}>{p.nom}</div><div style={{color:"#666",fontSize:11}}>{p.commune} · Îlot {p.ilot||"—"}</div></div>
+                    <div><div style={{fontWeight:"bold",fontSize:14}}>{p.nom}</div><div style={{color:"#666",fontSize:11}}>{p.commune} - Îlot {p.ilot||"—"}</div></div>
                   </div>
                   <div style={{display:"flex",gap:14,textAlign:"center",alignItems:"center"}}>
                     <div><div style={{fontWeight:"bold",color:"#2d6a2d"}}>{p.surface} ha</div><div style={{fontSize:10,color:"#999"}}>Surface</div></div>
@@ -833,7 +833,7 @@ function App(){
                           if(found){setFI(f=>({...f,produit:found.nom,numero_amm:found.amm,cible:found.cible,unite:found.unite,delai_rentree:String(found.dar)}));}
                         }
                       }} placeholder="Tapez le nom du produit..." list="ephy-list" style={{...IS,width:"100%"}}/>
-                      <datalist id="ephy-list">{EPHY_PRODUCTS.map(p=><option key={p.amm} value={p.nom}>{p.nom} — AMM {p.amm}</option>)}</datalist>
+                      <datalist id="ephy-list">{EPHY_PRODUCTS.map(p=><option key={p.amm} value={p.nom}/>)}</datalist>
                     </div>
                     <MicBtn onResult={v=>{setFI(f=>({...f,produit:v}));const found=EPHY_PRODUCTS.find(p=>p.nom.toLowerCase()===v.toLowerCase());if(found){setFI(f=>({...f,produit:found.nom,numero_amm:found.amm,cible:found.cible,unite:found.unite,delai_rentree:String(found.dar)}));} }}/>
                   </div>
@@ -892,7 +892,7 @@ function App(){
                 </table>
               </div>
               <div style={{padding:"8px 12px",background:"#f5f0e8",fontSize:10,color:"#888",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-                <span>📌 Conforme Règlement UE 2023/564 · Conservation 5 ans · {interventions.length} entrée(s)</span>
+                <span>📌 Conforme Règlement UE 2023/564 - Conservation 5 ans - {interventions.length} entrée(s)</span>
                 <button onClick={()=>printRegistre(interventions,parcelles)} style={{background:"#1a5a8a",color:"white",border:"none",borderRadius:6,padding:"4px 10px",cursor:"pointer",fontSize:10,fontFamily:"inherit"}}>🖨️ Imprimer</button>
               </div>
             </div>
@@ -1006,7 +1006,7 @@ function App(){
                   const assoAnnee=assolements.filter(a=>a.annee===anneeAsso);
                   const w=window.open("","_blank");
                   const rows=assoAnnee.map(a=>{const p=parcelles.find(p=>p.id===a.parcelle_id);return`<tr><td>${p?.nom||"—"}</td><td>${p?.ilot||"—"}</td><td>${a.culture}</td><td>${a.surface} ha</td></tr>`;}).join("");
-                  w.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Assolement ${anneeAsso}</title><style>body{font-family:Arial;font-size:12px;margin:20px}h1{color:#1a3a1a;font-size:16px}table{width:100%;border-collapse:collapse}th{background:#1a3a1a;color:#d4a843;padding:8px}td{padding:7px;border-bottom:1px solid #eee}@media print{button{display:none}}</style></head><body><h1>🌱 Assolement PAC — Campagne ${anneeAsso}</h1><p style="font-size:10px;color:#666">${SOCIETE.nom} · ${SOCIETE.adresse} · SIRET ${SOCIETE.siret} · Édité le ${new Date().toLocaleDateString("fr-FR")}</p><table><thead><tr><th>Parcelle</th><th>N° Îlot PAC</th><th>Culture</th><th>Surface</th></tr></thead><tbody>${rows}</tbody></table><br><button onclick="window.print()">🖨️ Imprimer</button></body></html>`);
+                  w.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Assolement ${anneeAsso}</title><style>body{font-family:Arial;font-size:12px;margin:20px}h1{color:#1a3a1a;font-size:16px}table{width:100%;border-collapse:collapse}th{background:#1a3a1a;color:#d4a843;padding:8px}td{padding:7px;border-bottom:1px solid #eee}@media print{button{display:none}}</style></head><body><h1>🌱 Assolement PAC — Campagne ${anneeAsso}</h1><p style="font-size:10px;color:#666">${SOCIETE.nom} - ${SOCIETE.adresse} - SIRET ${SOCIETE.siret} - Édité le ${new Date().toLocaleDateString("fr-FR")}</p><table><thead><tr><th>Parcelle</th><th>N° Îlot PAC</th><th>Culture</th><th>Surface</th></tr></thead><tbody>${rows}</tbody></table><br><button onclick="window.print()">🖨️ Imprimer</button></body></html>`);
                   w.document.close();setTimeout(()=>w.print(),300);
                 }} style={{background:"#d4a843",color:"#1a3a1a",border:"none",borderRadius:6,padding:"6px 14px",cursor:"pointer",fontFamily:"inherit",fontWeight:"bold",fontSize:12}}>🖨️ Export PAC {anneeAsso}</button>
               </div>
@@ -1147,7 +1147,7 @@ function App(){
         {/* DPHY */}
         {tab==="dphy"&&(
           <div>
-            <h2 style={{color:"#1a3a1a",fontSize:20,marginBottom:16}}>📊 Bilan DPHY — Déclaration annuelle</h2>
+            <h2 style={{color:"#1a3a1a",fontSize:20,marginBottom:16}}>📊 Bilan DPHY - Déclaration annuelle</h2>
             
             {/* Alerte date limite */}
             {new Date().getMonth()<5&&<div style={{background:"#fdf0f0",border:"2px solid #c0392b",borderRadius:10,padding:"12px 16px",marginBottom:16}}>
@@ -1192,61 +1192,57 @@ function App(){
             </div>
 
             {/* Tableau récapitulatif */}
-            {interventions.filter(i=>i.date?.startsWith(annee)).length===0?(
+            { interventions.filter(i=>i.date?.startsWith(annee)).length===0 ? (
               <div style={{background:"white",borderRadius:12,padding:36,textAlign:"center",color:"#aaa"}}>Aucun traitement enregistré pour {annee}</div>
-            ):(()=>{
-              const dphyData={};
-              interventions.filter(i=>i.date?.startsWith(annee)).forEach(i=>{
-                const k=i.produit+"_"+(i.numero_amm||"");
-                if(!dphyData[k])dphyData[k]={produit:i.produit,amm:i.numero_amm||"—",qte:0,surf:0,nb:0,cible:i.cible,unite:i.unite};
-                dphyData[k].qte+=(parseFloat(i.dose)||0)*(parseFloat(i.surface_traitee)||0);
-                dphyData[k].surf+=parseFloat(i.surface_traitee)||0;
-                dphyData[k].nb++;
-              });
-              const dphyRows=Object.values(dphyData);
-              return(
-                <div>
-                  <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(150px,1fr))",gap:12,marginBottom:16}}>
-                    {[
-                      {l:"Traitements",v:interventions.filter(i=>i.date?.startsWith(annee)).length,i:"🧴",c:"#8a4a1a"},
-                      {l:"Produits différents",v:dphyRows.length,i:"🌿",c:"#2d6a2d"},
-                      {l:"Surface max",v:dphyRows.length>0?Math.max(...dphyRows.map(r=>r.surf)).toFixed(1)+" ha":"0 ha",i:"🗺️",c:"#1a5a8a"},
-                    ].map(card=>(
-                      <div key={card.l} style={{background:"white",borderRadius:10,padding:"14px 16px",borderLeft:"4px solid "+card.c,boxShadow:"0 2px 8px rgba(0,0,0,.08)"}}>
-                        <div style={{fontSize:20,marginBottom:4}}>{card.i}</div>
-                        <div style={{fontSize:18,fontWeight:"bold",color:card.c}}>{card.v}</div>
-                        <div style={{fontSize:11,color:"#666"}}>{card.l}</div>
-                      </div>
-                    ))}
+            ) : (
+              <div>
+                <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(150px,1fr))",gap:12,marginBottom:16}}>
+                  {[
+                    {l:"Traitements",v:interventions.filter(i=>i.date?.startsWith(annee)).length,icon:"🧴",c:"#8a4a1a"},
+                    {l:"Produits différents",v:[...new Set(interventions.filter(i=>i.date?.startsWith(annee)).map(i=>i.produit))].length,icon:"🌿",c:"#2d6a2d"},
+                  ].map(card=>(
+                    <div key={card.l} style={{background:"white",borderRadius:10,padding:"14px 16px",borderLeft:"4px solid "+card.c,boxShadow:"0 2px 8px rgba(0,0,0,.08)"}}>
+                      <div style={{fontSize:20,marginBottom:4}}>{card.icon}</div>
+                      <div style={{fontSize:18,fontWeight:"bold",color:card.c}}>{card.v}</div>
+                      <div style={{fontSize:11,color:"#666"}}>{card.l}</div>
+                    </div>
+                  ))}
+                </div>
+                <div style={{background:"white",borderRadius:12,overflow:"hidden",boxShadow:"0 2px 8px rgba(0,0,0,.08)"}}>
+                  <div style={{padding:"12px 16px",background:"#1a3a1a",color:"#d4a843",fontWeight:"bold",fontSize:14}}>
+                    Récapitulatif produits — Campagne {annee}
                   </div>
-                  <div style={{background:"white",borderRadius:12,overflow:"hidden",boxShadow:"0 2px 8px rgba(0,0,0,.08)"}}>
-                    <div style={{padding:"12px 16px",background:"#1a3a1a",color:"#d4a843",fontWeight:"bold",fontSize:14}}>
-                      Récapitulatif produits — Campagne {annee}
-                    </div>
-                    <div style={{overflowX:"auto"}}>
-                      <table style={{width:"100%",borderCollapse:"collapse",fontSize:13}}>
-                        <thead><tr style={{background:"#f5f0e8"}}>{["Produit","N° AMM","Type","Qté totale","Surface","Nb traitements"].map(h=><th key={h} style={{padding:"10px 14px",textAlign:"left",color:"#555",fontWeight:"600",whiteSpace:"nowrap"}}>{h}</th>)}</tr></thead>
-                        <tbody>
-                          {dphyRows.map((r,idx)=>(
-                            <tr key={r.produit+idx} style={{background:idx%2===0?"#faf8f4":"white",borderBottom:"1px solid #f0ebe0"}}>
-                              <td style={{padding:"10px 14px",fontWeight:"600",color:"#8a4a1a"}}>{r.produit}</td>
-                              <td style={{padding:"10px 14px",fontFamily:"monospace",fontSize:11}}>{r.amm}</td>
-                              <td style={{padding:"10px 14px"}}><span style={{background:r.cible==="Fongicide"?"#e8f5e8":r.cible==="Herbicide"?"#fff3e0":"#fce4ec",padding:"2px 8px",borderRadius:10,fontSize:11}}>{r.cible}</span></td>
-                              <td style={{padding:"10px 14px",fontWeight:"bold"}}>{r.qte.toFixed(2)} {r.unite.replace("/ha","")}</td>
-                              <td style={{padding:"10px 14px"}}>{r.surf.toFixed(1)} ha</td>
-                              <td style={{padding:"10px 14px",textAlign:"center"}}><span style={{background:"#e8f5e8",color:"#2d6a2d",borderRadius:20,padding:"2px 10px",fontWeight:"bold"}}>{r.nb}</span></td>
+                  <div style={{overflowX:"auto"}}>
+                    <table style={{width:"100%",borderCollapse:"collapse",fontSize:13}}>
+                      <thead><tr style={{background:"#f5f0e8"}}>{["Produit","N° AMM","Type","Qté totale","Surface","Nb traitements"].map(h=><th key={h} style={{padding:"10px 14px",textAlign:"left",color:"#555",fontWeight:"600",whiteSpace:"nowrap"}}>{h}</th>)}</tr></thead>
+                      <tbody>
+                        {[...new Set(interventions.filter(i=>i.date?.startsWith(annee)).map(i=>i.produit))].map((produit,idx)=>{
+                          const lignes=interventions.filter(i=>i.date?.startsWith(annee)&&i.produit===produit);
+                          const qte=lignes.reduce((acc,i)=>acc+(parseFloat(i.dose)||0)*(parseFloat(i.surface_traitee)||0),0);
+                          const surf=lignes.reduce((acc,i)=>acc+(parseFloat(i.surface_traitee)||0),0);
+                          const amm=lignes[0]?.numero_amm||"—";
+                          const cible=lignes[0]?.cible||"—";
+                          const unite=lignes[0]?.unite||"L/ha";
+                          return(
+                            <tr key={produit} style={{background:idx%2===0?"#faf8f4":"white",borderBottom:"1px solid #f0ebe0"}}>
+                              <td style={{padding:"10px 14px",fontWeight:"600",color:"#8a4a1a"}}>{produit}</td>
+                              <td style={{padding:"10px 14px",fontFamily:"monospace",fontSize:11}}>{amm}</td>
+                              <td style={{padding:"10px 14px"}}><span style={{background:cible==="Fongicide"?"#e8f5e8":cible==="Herbicide"?"#fff3e0":"#fce4ec",padding:"2px 8px",borderRadius:10,fontSize:11}}>{cible}</span></td>
+                              <td style={{padding:"10px 14px",fontWeight:"bold"}}>{qte.toFixed(2)} {unite.replace("/ha","")}</td>
+                              <td style={{padding:"10px 14px"}}>{surf.toFixed(1)} ha</td>
+                              <td style={{padding:"10px 14px",textAlign:"center"}}><span style={{background:"#e8f5e8",color:"#2d6a2d",borderRadius:20,padding:"2px 10px",fontWeight:"bold"}}>{lignes.length}</span></td>
                             </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                    <div style={{padding:"10px 14px",background:"#f5f0e8",fontSize:11,color:"#888"}}>
-                      ⚠️ À déclarer sur telepac.agriculture.gouv.fr avant le 31/05/{parseInt(annee)+1} · DPHY obligatoire
-                    </div>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                  <div style={{padding:"10px 14px",background:"#f5f0e8",fontSize:11,color:"#888"}}>
+                    ⚠️ À déclarer sur telepac.agriculture.gouv.fr avant le 31/05/{parseInt(annee)+1} - DPHY obligatoire
                   </div>
                 </div>
-              );
-            })()}
+              </div>
+            )}
           </div>
         )}
 
@@ -1346,7 +1342,7 @@ function App(){
       </div>
 
       <div style={{background:"#1a3a1a",color:"#8aaa6a",textAlign:"center",padding:"14px",fontSize:10,marginTop:30}}>
-        FacilPhyto © {new Date().getFullYear()} — {SOCIETE.nom} · {SOCIETE.adresse} · SIRET {SOCIETE.siret} · <a href={`mailto:${SOCIETE.email}`} style={{color:"#d4a843"}}>{SOCIETE.email}</a>
+        FacilPhyto © {new Date().getFullYear()} — {SOCIETE.nom} - {SOCIETE.adresse} - SIRET {SOCIETE.siret} - <a href={`mailto:${SOCIETE.email}`} style={{color:"#d4a843"}}>{SOCIETE.email}</a>
       </div>
     </div>
   );
