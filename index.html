@@ -580,8 +580,8 @@ function App(){
   const [fE,setFE]=useState({culture:"",produit:"",type:"Engrais azoté",quantite:"",unite:"kg/ha",prix_unitaire:"",surface:"",date:new Date().toISOString().split("T")[0],annee:new Date().getFullYear().toString()});
   const [newPwd,setNewPwd]=useState("");
   const [pwdMsg,setPwdMsg]=useState("");
-  const emptyS={produit:"",numero_amm:"",quantite_achetee:"",unite:"L",date_achat:"",fournisseur:"",numero_lot:"",date_peremption:"",quantite_restante:""};
-  const [fS,setFS]=useState({produit:"",numero_amm:"",quantite_achetee:"",unite:"L",date_achat:new Date().toISOString().split("T")[0],fournisseur:"",numero_lot:"",date_peremption:"",quantite_restante:""});
+  const emptyS={produit:"",numero_amm:"",quantite_achetee:"",unite:"L",date_achat:"",fournisseur:"",numero_lot:"",date_peremption:"",quantite_restante:"",prix_unitaire:""};
+  const [fS,setFS]=useState({produit:"",numero_amm:"",quantite_achetee:"",unite:"L",date_achat:new Date().toISOString().split("T")[0],fournisseur:"",numero_lot:"",date_peremption:"",quantite_restante:"",prix_unitaire:""});
   const [anneeAsso,setAnneeAsso]=useState(new Date().getFullYear().toString());
   const emptyA={parcelle_id:"",annee:new Date().getFullYear().toString(),culture:"",surface:""};
   const [fA,setFA]=useState(emptyA);
@@ -643,6 +643,7 @@ function App(){
         produit:fS.produit,numero_amm:fS.numero_amm||"",
         quantite_achetee:qteAchetee,unite:fS.unite,
         quantite_restante:qteRestante,
+        prix_unitaire:parseFloat(fS.prix_unitaire)||0,
         date_achat:fS.date_achat,date_peremption:fS.date_peremption||"",
         fournisseur:fS.fournisseur||"",numero_lot:fS.numero_lot||"",
         user_id:user.id
@@ -653,7 +654,7 @@ function App(){
     }
     
     await loadStocks();
-    setFS({produit:"",numero_amm:"",quantite_achetee:"",unite:"L",date_achat:new Date().toISOString().split("T")[0],fournisseur:"",numero_lot:"",date_peremption:"",quantite_restante:""});
+    setFS({produit:"",numero_amm:"",quantite_achetee:"",unite:"L",date_achat:new Date().toISOString().split("T")[0],fournisseur:"",numero_lot:"",date_peremption:"",quantite_restante:"",prix_unitaire:""});
     setShowFS(false);
   };
 
@@ -1131,7 +1132,10 @@ function App(){
                 </FM>
                 <div><label style={{display:"block",fontSize:12,fontWeight:"600",marginBottom:4,color:"#555"}}>Date achat *</label><input type="date" value={fS.date_achat} onChange={e=>setFS(f=>({...f,date_achat:e.target.value}))} style={IS}/></div>
                 <div><label style={{display:"block",fontSize:12,fontWeight:"600",marginBottom:4,color:"#555"}}>Date péremption</label><input type="date" value={fS.date_peremption} onChange={e=>setFS(f=>({...f,date_peremption:e.target.value}))} style={IS}/></div>
-                <FM label="Fournisseur" onVoice={v=>setFS(f=>({...f,fournisseur:v}))}><input value={fS.fournisseur} onChange={e=>setFS(f=>({...f,fournisseur:e.target.value}))} placeholder="ex: Coopérative" style={{...IS,flex:1}}/></FM>
+                <FM label="Prix unitaire (€/L ou €/kg)" onVoice={v=>setFS(f=>({...f,prix_unitaire:v.replace(",",".")}))}>
+                    <input type="number" value={fS.prix_unitaire} onChange={e=>setFS(f=>({...f,prix_unitaire:e.target.value}))} step="0.01" placeholder="€" style={{...IS,flex:1}}/>
+                  </FM>
+                  <FM label="Fournisseur" onVoice={v=>setFS(f=>({...f,fournisseur:v}))}><input value={fS.fournisseur} onChange={e=>setFS(f=>({...f,fournisseur:e.target.value}))} placeholder="ex: Coopérative" style={{...IS,flex:1}}/></FM>
                 <FM label="N° de lot" onVoice={v=>setFS(f=>({...f,numero_lot:v}))}><input value={fS.numero_lot} onChange={e=>setFS(f=>({...f,numero_lot:e.target.value}))} style={{...IS,flex:1}}/></FM>
               </div>
               <div style={{display:"flex",gap:10,marginTop:12}}>
@@ -1143,7 +1147,7 @@ function App(){
             <div style={{background:"white",borderRadius:12,overflow:"hidden",boxShadow:"0 2px 8px rgba(0,0,0,.08)"}}>
               {stocks.length>0&&<div style={{overflowX:"auto"}}>
                 <table style={{width:"100%",borderCollapse:"collapse",fontSize:13}}>
-                  <thead><tr style={{background:"#1a3a1a",color:"#d4a843"}}>{["Date achat","Produit","N° AMM","Qté achetée","Qté utilisée","Qté restante","Fournisseur","N° lot","Péremption",""].map(h=><th key={h} style={{padding:"10px 12px",textAlign:"left",whiteSpace:"nowrap"}}>{h}</th>)}</tr></thead>
+                  <thead><tr style={{background:"#1a3a1a",color:"#d4a843"}}>{["Date achat","Produit","N° AMM","Qté achetée","Prix unit.","Coût total","Qté utilisée","Qté restante","Fournisseur","N° lot","Péremption",""].map(h=><th key={h} style={{padding:"10px 12px",textAlign:"left",whiteSpace:"nowrap"}}>{h}</th>)}</tr></thead>
                   <tbody>
                     {stocks.map((s,idx)=>{
                       const expire=s.date_peremption?Math.ceil((new Date(s.date_peremption)-new Date())/86400000):null;
@@ -1154,6 +1158,8 @@ function App(){
                         <td style={{padding:"8px 12px",fontWeight:"600",color:"#8a4a1a"}}>{s.produit}</td>
                         <td style={{padding:"8px 12px",fontFamily:"monospace",fontSize:11}}>{s.numero_amm||"—"}</td>
                         <td style={{padding:"8px 12px"}}>{s.quantite_achetee} {s.unite}</td>
+                        <td style={{padding:"8px 12px",color:"#1a5a8a"}}>{s.prix_unitaire?s.prix_unitaire+" €":"—"}</td>
+                        <td style={{padding:"8px 12px",fontWeight:"bold",color:"#2d6a2d"}}>{s.prix_unitaire?(parseFloat(s.quantite_achetee)*parseFloat(s.prix_unitaire)).toFixed(0)+" €":"—"}</td>
                         <td style={{padding:"8px 12px"}}>
                           {interventions.filter(i=>i.produit.toLowerCase()===s.produit.toLowerCase()).reduce((acc,i)=>acc+(parseFloat(i.dose)||0)*(parseFloat(i.surface_traitee)||0),0).toFixed(1)+" "+(s.unite||"")}
                         </td>
@@ -1361,8 +1367,9 @@ function App(){
 
               const totalPhytoGlobal=interventions.filter(i=>i.date?.startsWith(anneeAv)).reduce((acc,i)=>{
                 const stock=stocks.find(s=>s.produit.toLowerCase()===i.produit.toLowerCase());
-                const prixUnit=stock?0:0; // Prix non disponible sans saisie
-                return acc;
+                const prixUnit=stock?parseFloat(stock.prix_unitaire)||0:0;
+                const qteUtilisee=(parseFloat(i.dose)||0)*(parseFloat(i.surface_traitee)||0);
+                return acc+(prixUnit*qteUtilisee);
               },0);
 
               return(
@@ -1395,6 +1402,11 @@ function App(){
                             <div style={{fontSize:11,color:"#888",marginBottom:4}}>🌿 Produits utilisés</div>
                             <div style={{fontSize:18,fontWeight:"bold",color:"#8a4a1a"}}>{[...new Set(interCulture.map(i=>i.produit))].length}</div>
                             <div style={{fontSize:11,color:"#aaa"}}>produits différents</div>
+                          </div>
+                          <div style={{background:"#fff3e0",padding:"14px 16px"}}>
+                            <div style={{fontSize:11,color:"#e67e22",marginBottom:4,fontWeight:"600"}}>🧴 Coût phyto estimé</div>
+                            <div style={{fontSize:18,fontWeight:"bold",color:"#e67e22"}}>{interCulture.reduce((acc,i)=>{const st=stocks.find(s=>s.produit.toLowerCase()===i.produit.toLowerCase());return acc+(parseFloat(st?.prix_unitaire)||0)*(parseFloat(i.dose)||0)*(parseFloat(i.surface_traitee)||0);},0).toFixed(0)} €</div>
+                            <div style={{fontSize:11,color:"#aaa"}}>{interCulture.some(i=>!stocks.find(s=>s.produit.toLowerCase()===i.produit.toLowerCase())?.prix_unitaire)?"⚠️ Prix manquants":"total campagne"}</div>
                           </div>
                           <div style={{background:"white",padding:"14px 16px"}}>
                             <div style={{fontSize:11,color:"#888",marginBottom:4}}>💧 Engrais</div>
@@ -1456,8 +1468,12 @@ function App(){
                           <div style={{fontSize:13,color:"#555"}}>
                             💰 <strong>Avance sur culture {culture} — Campagne {anneeAv}</strong>
                           </div>
-                          <div style={{fontSize:16,fontWeight:"bold",color:"#1a3a1a"}}>
-                            Engrais : {totalEngrais.toFixed(0)} € {totalEngrais>0?"✅":"⚠️ Prix à saisir"}
+                          <div style={{fontSize:13,color:"#1a3a1a"}}>
+                            🌿 Engrais : <strong>{totalEngrais.toFixed(0)} €</strong> {totalEngrais>0?"✅":"⚠️"}
+                            &nbsp;|&nbsp;
+                            🧴 Phyto : <strong>{totalPhytoGlobal.toFixed(0)} €</strong> {totalPhytoGlobal>0?"✅":"⚠️ Prix à saisir dans Stocks"}
+                            &nbsp;|&nbsp;
+                            💰 <strong>Total : {(totalEngrais+totalPhytoGlobal).toFixed(0)} €</strong>
                           </div>
                         </div>
                       </div>
