@@ -370,7 +370,7 @@ function App(){
   },[]);
 
   // Charger données
-  useEffect(()=>{if(user){loadData();loadStocks();}},[user]);
+  useEffect(()=>{if(user){loadData();loadStocks();loadEngrais();}},[user]);
 
   const loadData=async()=>{
     const[{data:p},{data:i},{data:c}]=await Promise.all([
@@ -564,7 +564,7 @@ function App(){
   const annees=[...new Set(interventions.map(i=>i.date?.split("-")[0]).filter(Boolean))].sort((a,b)=>b-a);
   const interByAnnee=interventions.filter(i=>i.date?.startsWith(annee));
 
-  const TABS=[["dashboard","📊","Tableau de bord"],["parcelles","🗺️","Parcelles"],["registre","📋","Registre phyto"],["archives","📅","Archives"],["assolement","🌱","Assolement"],["stocks","📦","Stocks phyto"],["dphy","📊","DPHY"],["certiphyto","🎓","Certiphyto"],["conseil","🤖","Conseiller IA"]];
+  const TABS=[["dashboard","📊","Tableau de bord"],["parcelles","🗺️","Parcelles"],["registre","📋","Registre phyto"],["archives","📅","Archives"],["assolement","🌱","Assolement"],["stocks","📦","Stocks phyto"],["dphy","📊","DPHY"],["avances","📈","Avances cultures"],["certiphyto","🎓","Certiphyto"],["conseil","🤖","Conseiller IA"]];
   
   // Assolement state
   const [assolements,setAssolements]=useState([]);
@@ -573,6 +573,11 @@ function App(){
   const [showFS,setShowFS]=useState(false);
   const [editingStockId,setEditingStockId]=useState(null);
   const [showPwdModal,setShowPwdModal]=useState(false);
+  const [engrais,setEngrais]=useState([]);
+  const [showFE,setShowFE]=useState(false);
+  const [anneeAv,setAnneeAv]=useState(new Date().getFullYear().toString());
+  const emptyE={culture:"",produit:"",type:"Engrais azoté",quantite:"",unite:"kg/ha",prix_unitaire:"",surface:"",date:new Date().toISOString().split("T")[0],annee:new Date().getFullYear().toString()};
+  const [fE,setFE]=useState({culture:"",produit:"",type:"Engrais azoté",quantite:"",unite:"kg/ha",prix_unitaire:"",surface:"",date:new Date().toISOString().split("T")[0],annee:new Date().getFullYear().toString()});
   const [newPwd,setNewPwd]=useState("");
   const [pwdMsg,setPwdMsg]=useState("");
   const emptyS={produit:"",numero_amm:"",quantite_achetee:"",unite:"L",date_achat:"",fournisseur:"",numero_lot:"",date_peremption:"",quantite_restante:""};
@@ -588,6 +593,16 @@ function App(){
     if(!error){setPwdMsg("✅ Mot de passe modifié avec succès !");setNewPwd("");setTimeout(()=>{setShowPwdModal(false);setPwdMsg("");},2000);}
     else{setPwdMsg("❌ Erreur : "+error.message);}
   };
+  const loadEngrais=async()=>{
+    const{data}=await supabase.from("engrais").select("*").eq("user_id",user.id).order("date",{ascending:false});
+    setEngrais(data||[]);
+  };
+  const addE=async()=>{
+    if(!fE.culture||!fE.produit||!fE.quantite||!fE.prix_unitaire||!fE.surface)return;
+    const{error}=await supabase.from("engrais").insert({...fE,quantite:parseFloat(fE.quantite)||0,prix_unitaire:parseFloat(fE.prix_unitaire)||0,surface:parseFloat(fE.surface)||0,user_id:user.id});
+    if(!error){await loadEngrais();setFE({culture:"",produit:"",type:"Engrais azoté",quantite:"",unite:"kg/ha",prix_unitaire:"",surface:"",date:new Date().toISOString().split("T")[0],annee:new Date().getFullYear().toString()});setShowFE(false);showSave("✅ Engrais enregistré !");}
+  };
+  const delE=async(id)=>{await supabase.from("engrais").delete().eq("id",id);await loadEngrais();};
   const loadStocks=async()=>{
     const{data}=await supabase.from("stocks_phyto").select("*").eq("user_id",user.id).order("date_achat",{ascending:false});
     setStocks(data||[]);
@@ -1264,6 +1279,220 @@ function App(){
                 </div>
               </div>
             )}
+          </div>
+        )}
+
+        {/* AVANCES CULTURES */}
+        {tab==="avances"&&(
+          <div>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16,flexWrap:"wrap",gap:8}}>
+              <h2 style={{color:"#1a3a1a",fontSize:20,margin:0}}>📈 Avances sur cultures</h2>
+              <button onClick={()=>setShowFE(!showFE)} style={{background:"#1a5a8a",color:"white",border:"none",borderRadius:8,padding:"8px 16px",cursor:"pointer",fontFamily:"inherit",fontWeight:"bold",fontSize:13}}>+ Saisir engrais</button>
+            </div>
+
+            <div style={{background:"#fffbf0",border:"1px solid #d4a843",borderRadius:8,padding:"10px 14px",marginBottom:16,fontSize:12,color:"#8a6a00"}}>
+              📋 Suivi des charges phyto et engrais par culture — pour le calcul des avances sur cultures au bilan
+            </div>
+
+            {/* Formulaire engrais */}
+            {showFE&&<div style={{background:"white",borderRadius:12,padding:20,marginBottom:18,border:"2px solid #1a5a8a",boxShadow:"0 4px 16px rgba(0,0,0,.1)"}}>
+              <div style={{fontWeight:"bold",marginBottom:12,color:"#1a3a1a"}}>➕ Saisir un apport d'engrais</div>
+              <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(200px,1fr))",gap:12}}>
+                <div>
+                  <label style={{display:"block",fontSize:12,fontWeight:"600",marginBottom:4,color:"#555"}}>Culture *</label>
+                  <select value={fE.culture} onChange={e=>setFE(f=>({...f,culture:e.target.value}))} style={IS}>
+                    <option value="">-- Choisir --</option>
+                    {CULTURES.map(c=><option key={c}>{c}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label style={{display:"block",fontSize:12,fontWeight:"600",marginBottom:4,color:"#555"}}>Type d'engrais *</label>
+                  <select value={fE.type} onChange={e=>setFE(f=>({...f,type:e.target.value}))} style={IS}>
+                    {["Engrais azoté","Engrais phosphaté","Engrais potassique","Engrais complexe NPK","Amendement calcaire","Amendement organique","Soufre","Oligo-éléments","Autre"].map(t=><option key={t}>{t}</option>)}
+                  </select>
+                </div>
+                <FM label="Produit *" onVoice={v=>setFE(f=>({...f,produit:v}))}>
+                  <input value={fE.produit} onChange={e=>setFE(f=>({...f,produit:e.target.value}))} placeholder="ex: Urée 46, DAP, KCl..." style={{...IS,flex:1}}/>
+                </FM>
+                <div style={{display:"flex",gap:8}}>
+                  <FM label="Quantité *" onVoice={v=>setFE(f=>({...f,quantite:v.replace(",",".")}))}>
+                    <input type="number" value={fE.quantite} onChange={e=>setFE(f=>({...f,quantite:e.target.value}))} step="0.1" style={{...IS,flex:1}}/>
+                  </FM>
+                  <div style={{width:90,flexShrink:0}}>
+                    <label style={{display:"block",fontSize:12,fontWeight:"600",marginBottom:4,color:"#555"}}>Unité</label>
+                    <select value={fE.unite} onChange={e=>setFE(f=>({...f,unite:e.target.value}))} style={{...IS,width:"100%"}}>
+                      {["kg/ha","L/ha","t/ha","unité/ha"].map(u=><option key={u}>{u}</option>)}
+                    </select>
+                  </div>
+                </div>
+                <FM label="Prix unitaire (€/t ou €/L) *" onVoice={v=>setFE(f=>({...f,prix_unitaire:v.replace(",",".")}))}>
+                  <input type="number" value={fE.prix_unitaire} onChange={e=>setFE(f=>({...f,prix_unitaire:e.target.value}))} step="0.01" placeholder="€" style={{...IS,flex:1}}/>
+                </FM>
+                <FM label="Surface (ha) *" onVoice={v=>setFE(f=>({...f,surface:v.replace(",",".")}))}>
+                  <input type="number" value={fE.surface} onChange={e=>setFE(f=>({...f,surface:e.target.value}))} step="0.1" style={{...IS,flex:1}}/>
+                </FM>
+                <div>
+                  <label style={{display:"block",fontSize:12,fontWeight:"600",marginBottom:4,color:"#555"}}>Date *</label>
+                  <input type="date" value={fE.date} onChange={e=>setFE(f=>({...f,date:e.target.value,annee:e.target.value.split("-")[0]}))} style={IS}/>
+                </div>
+              </div>
+              <div style={{display:"flex",gap:10,marginTop:12}}>
+                <button onClick={addE} style={{background:"#1a5a8a",color:"white",border:"none",borderRadius:8,padding:"8px 20px",cursor:"pointer",fontFamily:"inherit",fontWeight:"bold"}}>✅ Enregistrer</button>
+                <button onClick={()=>setShowFE(false)} style={{background:"#e8e0d0",color:"#555",border:"none",borderRadius:8,padding:"8px 16px",cursor:"pointer",fontFamily:"inherit"}}>Annuler</button>
+              </div>
+            </div>}
+
+            {/* Sélecteur année */}
+            <div style={{display:"flex",gap:8,marginBottom:16,flexWrap:"wrap",alignItems:"center"}}>
+              <span style={{fontSize:13,fontWeight:"600",color:"#555"}}>Campagne :</span>
+              {[2023,2024,2025,2026,2027].map(a=>(
+                <button key={a} onClick={()=>setAnneeAv(String(a))} style={{background:anneeAv===String(a)?"#1a3a1a":"white",color:anneeAv===String(a)?"#d4a843":"#555",border:"2px solid",borderColor:anneeAv===String(a)?"#1a3a1a":"#e0d8c8",borderRadius:8,padding:"6px 14px",cursor:"pointer",fontFamily:"inherit",fontWeight:anneeAv===String(a)?"bold":"normal",fontSize:13}}>{a}</button>
+              ))}
+            </div>
+
+            {/* Récapitulatif par culture */}
+            {(()=>{
+              const culturesAnnee=[...new Set([
+                ...interventions.filter(i=>i.date?.startsWith(anneeAv)).map(i=>i.culture_parcelle).filter(Boolean),
+                ...engrais.filter(e=>e.annee===anneeAv).map(e=>e.culture).filter(Boolean)
+              ])];
+
+              if(culturesAnnee.length===0) return <div style={{background:"white",borderRadius:12,padding:36,textAlign:"center",color:"#aaa"}}>Aucune donnée pour {anneeAv}</div>;
+
+              const totalPhytoGlobal=interventions.filter(i=>i.date?.startsWith(anneeAv)).reduce((acc,i)=>{
+                const stock=stocks.find(s=>s.produit.toLowerCase()===i.produit.toLowerCase());
+                const prixUnit=stock?0:0; // Prix non disponible sans saisie
+                return acc;
+              },0);
+
+              return(
+                <div>
+                  {culturesAnnee.map(culture=>{
+                    const interCulture=interventions.filter(i=>i.date?.startsWith(anneeAv)&&i.culture_parcelle===culture);
+                    const engraisCulture=engrais.filter(e=>e.annee===anneeAv&&e.culture===culture);
+                    const surfacePhyto=interCulture.reduce((acc,i)=>Math.max(acc,parseFloat(i.surface_traitee)||0),0);
+                    const totalEngrais=engraisCulture.reduce((acc,e)=>{
+                      const qte=parseFloat(e.quantite)||0;
+                      const prix=parseFloat(e.prix_unitaire)||0;
+                      const surf=parseFloat(e.surface)||0;
+                      return acc+(qte*prix*surf/1000);
+                    },0);
+                    const nbTraitements=interCulture.length;
+
+                    return(
+                      <div key={culture} style={{background:"white",borderRadius:12,marginBottom:16,overflow:"hidden",boxShadow:"0 2px 8px rgba(0,0,0,.08)"}}>
+                        <div style={{padding:"12px 16px",background:"#1a3a1a",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                          <div style={{color:"#d4a843",fontWeight:"bold",fontSize:14}}>🌾 {culture}</div>
+                          <div style={{color:"white",fontSize:12}}>Campagne {anneeAv}</div>
+                        </div>
+                        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(180px,1fr))",gap:1,background:"#f0ebe0"}}>
+                          <div style={{background:"white",padding:"14px 16px"}}>
+                            <div style={{fontSize:11,color:"#888",marginBottom:4}}>🧴 Traitements phyto</div>
+                            <div style={{fontSize:18,fontWeight:"bold",color:"#8a4a1a"}}>{nbTraitements}</div>
+                            <div style={{fontSize:11,color:"#aaa"}}>interventions</div>
+                          </div>
+                          <div style={{background:"white",padding:"14px 16px"}}>
+                            <div style={{fontSize:11,color:"#888",marginBottom:4}}>🌿 Produits utilisés</div>
+                            <div style={{fontSize:18,fontWeight:"bold",color:"#8a4a1a"}}>{[...new Set(interCulture.map(i=>i.produit))].length}</div>
+                            <div style={{fontSize:11,color:"#aaa"}}>produits différents</div>
+                          </div>
+                          <div style={{background:"white",padding:"14px 16px"}}>
+                            <div style={{fontSize:11,color:"#888",marginBottom:4}}>💧 Engrais</div>
+                            <div style={{fontSize:18,fontWeight:"bold",color:"#1a5a8a"}}>{engraisCulture.length}</div>
+                            <div style={{fontSize:11,color:"#aaa"}}>apports</div>
+                          </div>
+                          <div style={{background:"#e8f5e8",padding:"14px 16px"}}>
+                            <div style={{fontSize:11,color:"#2d6a2d",marginBottom:4,fontWeight:"600"}}>💰 Coût engrais estimé</div>
+                            <div style={{fontSize:18,fontWeight:"bold",color:"#2d6a2d"}}>{totalEngrais.toFixed(0)} €</div>
+                            <div style={{fontSize:11,color:"#aaa"}}>total campagne</div>
+                          </div>
+                        </div>
+
+                        {/* Détail engrais */}
+                        {engraisCulture.length>0&&<div style={{padding:"12px 16px"}}>
+                          <div style={{fontSize:12,fontWeight:"600",color:"#1a5a8a",marginBottom:8}}>Détail apports engrais :</div>
+                          <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
+                            <thead><tr style={{background:"#f5f0e8"}}>{["Date","Produit","Type","Qté","Surface","Coût total",""].map(h=><th key={h} style={{padding:"6px 10px",textAlign:"left",color:"#555"}}>{h}</th>)}</tr></thead>
+                            <tbody>
+                              {engraisCulture.map((e,idx)=>{
+                                const cout=(parseFloat(e.quantite)||0)*(parseFloat(e.prix_unitaire)||0)*(parseFloat(e.surface)||0)/1000;
+                                return(
+                                  <tr key={e.id} style={{background:idx%2===0?"#faf8f4":"white",borderBottom:"1px solid #f0ebe0"}}>
+                                    <td style={{padding:"6px 10px"}}>{e.date}</td>
+                                    <td style={{padding:"6px 10px",fontWeight:"600",color:"#1a5a8a"}}>{e.produit}</td>
+                                    <td style={{padding:"6px 10px",fontSize:11}}><span style={{background:"#e8f0ff",color:"#1a5a8a",padding:"2px 6px",borderRadius:8}}>{e.type}</span></td>
+                                    <td style={{padding:"6px 10px"}}>{e.quantite} {e.unite}</td>
+                                    <td style={{padding:"6px 10px"}}>{e.surface} ha</td>
+                                    <td style={{padding:"6px 10px",fontWeight:"bold",color:"#2d6a2d"}}>{cout.toFixed(0)} €</td>
+                                    <td style={{padding:"6px 10px"}}><button onClick={()=>delE(e.id)} style={{background:"none",border:"none",cursor:"pointer",color:"#c0392b",fontSize:12}}>🗑</button></td>
+                                  </tr>
+                                );
+                              })}
+                            </tbody>
+                          </table>
+                        </div>}
+
+                        {/* Détail phyto */}
+                        {interCulture.length>0&&<div style={{padding:"12px 16px",borderTop:"1px solid #f0ebe0"}}>
+                          <div style={{fontSize:12,fontWeight:"600",color:"#8a4a1a",marginBottom:8}}>Détail traitements phyto :</div>
+                          <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
+                            <thead><tr style={{background:"#f5f0e8"}}>{["Date","Produit","Dose","Surface","Cible"].map(h=><th key={h} style={{padding:"6px 10px",textAlign:"left",color:"#555"}}>{h}</th>)}</tr></thead>
+                            <tbody>
+                              {interCulture.map((i,idx)=>(
+                                <tr key={i.id} style={{background:idx%2===0?"#faf8f4":"white",borderBottom:"1px solid #f0ebe0"}}>
+                                  <td style={{padding:"6px 10px"}}>{i.date}</td>
+                                  <td style={{padding:"6px 10px",fontWeight:"600",color:"#8a4a1a"}}>{i.produit}</td>
+                                  <td style={{padding:"6px 10px"}}>{i.dose} {i.unite}</td>
+                                  <td style={{padding:"6px 10px"}}>{i.surface_traitee} ha</td>
+                                  <td style={{padding:"6px 10px"}}><span style={{background:"#fff3e0",color:"#e67e22",padding:"2px 6px",borderRadius:8,fontSize:11}}>{i.cible}</span></td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>}
+
+                        {/* Total avance */}
+                        <div style={{padding:"12px 16px",background:"#f5f0e8",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                          <div style={{fontSize:13,color:"#555"}}>
+                            💰 <strong>Avance sur culture {culture} — Campagne {anneeAv}</strong>
+                          </div>
+                          <div style={{fontSize:16,fontWeight:"bold",color:"#1a3a1a"}}>
+                            Engrais : {totalEngrais.toFixed(0)} € {totalEngrais>0?"✅":"⚠️ Prix à saisir"}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+
+                  {/* Export */}
+                  <button onClick={()=>{
+                    let csv="AVANCES SUR CULTURES - Campagne "+anneeAv+"\n\n";
+                    culturesAnnee.forEach(culture=>{
+                      csv+="Culture : "+culture+"\n";
+                      csv+="--- Engrais ---\n";
+                      csv+="Date,Produit,Type,Quantite,Unite,Prix unitaire,Surface,Cout total\n";
+                      engrais.filter(e=>e.annee===anneeAv&&e.culture===culture).forEach(e=>{
+                        const cout=(parseFloat(e.quantite)||0)*(parseFloat(e.prix_unitaire)||0)*(parseFloat(e.surface)||0)/1000;
+                        csv+=e.date+","+e.produit+","+e.type+","+e.quantite+","+e.unite+","+e.prix_unitaire+","+e.surface+","+cout.toFixed(2)+"\n";
+                      });
+                      csv+="--- Traitements phyto ---\n";
+                      csv+="Date,Produit,Dose,Unite,Surface,Cible\n";
+                      interventions.filter(i=>i.date?.startsWith(anneeAv)&&i.culture_parcelle===culture).forEach(i=>{
+                        csv+=i.date+","+i.produit+","+i.dose+","+i.unite+","+i.surface_traitee+","+i.cible+"\n";
+                      });
+                      csv+="\n";
+                    });
+                    const blob=new Blob(["﻿"+csv],{type:"text/csv;charset=utf-8;"});
+                    const url=URL.createObjectURL(blob);
+                    const a=document.createElement("a");
+                    a.href=url;a.download="Avances_cultures_"+anneeAv+".csv";
+                    document.body.appendChild(a);a.click();document.body.removeChild(a);URL.revokeObjectURL(url);
+                  }} style={{background:"#2d6a2d",color:"white",border:"none",borderRadius:8,padding:"10px 20px",cursor:"pointer",fontFamily:"inherit",fontWeight:"bold",fontSize:13,marginTop:8}}>
+                    📥 Exporter avances {anneeAv} (CSV)
+                  </button>
+                </div>
+              );
+            })()}
           </div>
         )}
 
