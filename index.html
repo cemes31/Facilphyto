@@ -572,6 +572,9 @@ function App(){
   const [stocks,setStocks]=useState([]);
   const [showFS,setShowFS]=useState(false);
   const [editingStockId,setEditingStockId]=useState(null);
+  const [showPwdModal,setShowPwdModal]=useState(false);
+  const [newPwd,setNewPwd]=useState("");
+  const [pwdMsg,setPwdMsg]=useState("");
   const emptyS={produit:"",numero_amm:"",quantite_achetee:"",unite:"L",date_achat:"",fournisseur:"",numero_lot:"",date_peremption:"",quantite_restante:""};
   const [fS,setFS]=useState({produit:"",numero_amm:"",quantite_achetee:"",unite:"L",date_achat:new Date().toISOString().split("T")[0],fournisseur:"",numero_lot:"",date_peremption:"",quantite_restante:""});
   const [anneeAsso,setAnneeAsso]=useState(new Date().getFullYear().toString());
@@ -579,6 +582,12 @@ function App(){
   const [fA,setFA]=useState(emptyA);
 
   useEffect(()=>{if(user)loadAssolements();},[user]);
+  const changePassword=async()=>{
+    if(newPwd.length<6){setPwdMsg("❌ Le mot de passe doit faire au moins 6 caractères");return;}
+    const{error}=await supabase.auth.updateUser({password:newPwd});
+    if(!error){setPwdMsg("✅ Mot de passe modifié avec succès !");setNewPwd("");setTimeout(()=>{setShowPwdModal(false);setPwdMsg("");},2000);}
+    else{setPwdMsg("❌ Erreur : "+error.message);}
+  };
   const loadStocks=async()=>{
     const{data}=await supabase.from("stocks_phyto").select("*").eq("user_id",user.id).order("date_achat",{ascending:false});
     setStocks(data||[]);
