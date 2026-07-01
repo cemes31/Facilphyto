@@ -685,7 +685,19 @@ function App(){
               {key==="certiphyto"&&nbAlerts>0&&<span style={{background:"#c0392b",color:"white",borderRadius:"50%",width:13,height:13,fontSize:8,display:"flex",alignItems:"center",justifyContent:"center",position:"absolute",top:1,right:1}}>{nbAlerts}</span>}
             </button>
           ))}
+          <button onClick={()=>setShowPwdModal(true)} style={{background:"transparent",color:"#d4a843",border:"1px solid #d4a843",borderRadius:6,padding:"6px 9px",cursor:"pointer",fontFamily:"inherit",fontSize:11,marginLeft:4}}>🔑</button>
           <button onClick={()=>supabase.auth.signOut()} style={{background:"transparent",color:"#c0392b",border:"1px solid #c0392b",borderRadius:6,padding:"6px 9px",cursor:"pointer",fontFamily:"inherit",fontSize:11,marginLeft:4}}>Déconnexion</button>
+          {showPwdModal&&<div style={{position:"fixed",top:0,left:0,right:0,bottom:0,background:"rgba(0,0,0,.5)",zIndex:1000,display:"flex",alignItems:"center",justifyContent:"center"}}>
+            <div style={{background:"white",borderRadius:16,padding:28,width:320,boxShadow:"0 8px 32px rgba(0,0,0,.3)"}}>
+              <div style={{fontWeight:"bold",fontSize:16,color:"#1a3a1a",marginBottom:16}}>🔑 Changer mon mot de passe</div>
+              <input type="password" value={newPwd} onChange={e=>setNewPwd(e.target.value)} placeholder="Nouveau mot de passe (6 min)" style={{width:"100%",padding:"10px 12px",borderRadius:8,border:"1px solid #ddd",fontSize:14,marginBottom:12,fontFamily:"inherit",boxSizing:"border-box"}}/>
+              {pwdMsg&&<div style={{fontSize:12,marginBottom:12,color:pwdMsg.startsWith("✅")?"#27ae60":"#c0392b"}}>{pwdMsg}</div>}
+              <div style={{display:"flex",gap:8}}>
+                <button onClick={changePassword} style={{flex:1,background:"#2d6a2d",color:"white",border:"none",borderRadius:8,padding:"10px",cursor:"pointer",fontFamily:"inherit",fontWeight:"bold"}}>Valider</button>
+                <button onClick={()=>{setShowPwdModal(false);setNewPwd("");setPwdMsg("");}} style={{flex:1,background:"#e8e0d0",color:"#555",border:"none",borderRadius:8,padding:"10px",cursor:"pointer",fontFamily:"inherit"}}>Annuler</button>
+              </div>
+            </div>
+          </div>}
         </div>
       </div>
 
