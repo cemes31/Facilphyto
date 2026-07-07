@@ -397,7 +397,7 @@ function App(){
     const newDose=parseFloat(fI.dose)||0;
     const newSurface=parseFloat(fI.surface_traitee)||0;
     const newQte=newDose*newSurface;
-    const diff=newQte-oldQte; // Positive = more used, negative = less used
+    const produitChange=oldIntervention&&oldIntervention.produit.toLowerCase()!==fI.produit.toLowerCase();
     
     const{error}=await supabase.from("interventions").update({
       parcelle_id:fI.parcelle_id,date:fI.date,produit:fI.produit,numero_amm:fI.numero_amm||"",
@@ -408,16 +408,54 @@ function App(){
     }).eq("id",editingI);
     
     if(!error){
-      // Update stock if diff != 0
-      if(diff!==0){
-        const stockProduit=stocks.find(s=>s.produit.toLowerCase()===fI.produit.toLowerCase());
-        if(stockProduit){
-          const nouvelleQte=parseFloat(stockProduit.quantite_restante)-diff;
-          await supabase.from("stocks_phyto").update({quantite_restante:nouvelleQte}).eq("id",stockProduit.id);
-          await loadStocks();
+      if(produitChange){
+        // Produit différent : on restitue l'ancien produit et on débite le nouveau séparément
+        if(oldQte!==0){
+          const oldStockProduit=stocks.find(s=>s.produit.toLowerCase()===oldIntervention.produit.toLowerCase());
+          if(oldStockProduit){
+            const qteRestituee=parseFloat(oldStockProduit.quantite_restante)+oldQte;
+            await supabase.from("stocks_phyto").update({quantite_restante:qteRestituee}).eq("id",oldStockProduit.id);
+          }
+        }
+        const newStockProduit=stocks.find(s=>s.produit.toLowerCase()===fI.produit.toLowerCase());
+        if(newStockProduit){
+          const nouvelleQte=parseFloat(newStockProduit.quantite_restante)-newQte;
+          await supabase.from("stocks_phyto").update({quantite_restante:nouvelleQte}).eq("id",newStockProduit.id);
+        }else if(newQte!==0){
+          await supabase.from("stocks_phyto").insert({
+            produit:fI.produit,numero_amm:fI.numero_amm||"",quantite_achetee:0,
+            unite:fI.unite.replace("/ha",""),quantite_restante:-newQte,date_achat:fI.date,
+            fournisseur:"⚠️ À régulariser",numero_lot:"",date_peremption:"",user_id:user.id
+          });
+        }
+        await loadStocks();
+      }else{
+        // Même produit : on applique juste la différence de quantité
+        const diff=newQte-oldQte;
+        if(diff!==0){
+          const stockProduit=stocks.find(s=>s.produit.toLowerCase()===fI.produit.toLowerCase());
+          if(stockProduit){
+            const nouvelleQte=parseFloat(stockProduit.quantite_restante)-diff;
+            await supabase.from("stocks_phyto").update({quantite_restante:nouvelleQte}).eq("id",stockProduit.id);
+            await loadStocks();
+          }
         }
       }
-      await loadData();setFI(emptyI);setShowFI(false);setEditingI(null);setDicteeTexte("");setDicteeRes(null);showSave("✅ Traitement modifié — stock mis à jour !");
+      // Mise à jour de l'assolement si culture/parcelle renseignée
+      if(fI.culture_parcelle&&fI.parcelle_id){
+        const anneeTraitement=fI.date?fI.date.split("-")[0]:new Date().getFullYear().toString();
+        const assoExistant=assolements.find(a=>a.parcelle_id===fI.parcelle_id&&a.annee===anneeTraitement);
+        if(!assoExistant){
+          await supabase.from("assolements").insert({
+            parcelle_id:fI.parcelle_id,annee:anneeTraitement,culture:fI.culture_parcelle,
+            surface:parseFloat(fI.surface_traitee)||0,user_id:user.id
+          });
+        }else if(assoExistant.culture!==fI.culture_parcelle){
+          await supabase.from("assolements").update({culture:fI.culture_parcelle}).eq("id",assoExistant.id);
+        }
+        await loadAssolements();
+      }
+      await loadData();setFI(emptyI);setShowFI(false);setEditingI(null);setDicteeTexte("");setDicteeRes(null);showSave("✅ Traitement modifié — stock et assolement mis à jour !");
     }
   };
 
